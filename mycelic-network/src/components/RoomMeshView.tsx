@@ -331,7 +331,7 @@ export function RoomMeshView({
             </span>
             <span className="pill">Ephemeral · no archives</span>
             <span className="pill">
-              {paymentConfig.policy.environment === "testnet"
+              {paymentConfig.policy.environment === "mainnet"
                 ? "Test USDC"
                 : "USDC"}
             </span>

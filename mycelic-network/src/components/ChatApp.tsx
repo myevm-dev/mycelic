@@ -51,7 +51,7 @@ export function ChatApp() {
   const [client] = useState(() => new LocalRoomClient(session));
   const [paymentConfig, setPaymentConfig] =
     useState<PublicPaymentConfig | null>(null);
-  const [chainKey, setChainKey] = useState("arcTestnet");
+  const [chainKey, setChainKey] = useState("arc");
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
   const [joined, setJoined] = useState<JoinedRoom | null>(null);
@@ -428,7 +428,7 @@ export function ChatApp() {
                 <Icon name="chat" />
               </span>
               <span className="eyebrow">MYCELIC CHAT</span>
-              <span className="pill">Arc testnet payments</span>
+           
             </div>
             <h1>
               Mycelic Chat<span className="accent-text">.</span>
