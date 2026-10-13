@@ -15,7 +15,7 @@
     "format": "prettier --write src packages scripts tests e2e docs deploy *.json *.ts *.mjs *.md",
     "setup": "node --import=tsx scripts/setup.ts",
     "agent": "node --env-file-if-exists=.env.agent --import=tsx scripts/agents/cli.ts",
-    "gateway:check": "node --import=tsx scripts/gateway-check.ts",
+    "gateway:check": "node --env-file-if-exists=.env.local --import=tsx scripts/gateway-check.ts",
     "payments:inspect": "node --env-file-if-exists=.env.local --import=tsx scripts/payments-inspect.ts",
     "backup": "node --env-file-if-exists=.env.local --import=tsx scripts/backup.ts",
     "backup:verify": "node --import=tsx scripts/verify-backup.ts"
