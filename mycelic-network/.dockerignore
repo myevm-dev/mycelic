@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+**/*.env
+.mycelic-data
+.mycelic-test-data
+.mycelic-backups
+.demo-data
+test-results
+playwright-report
+*.zip
+*.tsbuildinfo

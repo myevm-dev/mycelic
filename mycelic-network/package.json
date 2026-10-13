@@ -1,0 +1,54 @@
+{
+  "name": "mycelic-chat",
+  "version": "0.6.1",
+  "private": true,
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "dev": "next dev --webpack --hostname 127.0.0.1",
+    "build": "next build --webpack",
+    "start": "next start --hostname 127.0.0.1",
+    "check:types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node scripts/e2e-clean.mjs && playwright test",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write src packages scripts tests e2e docs deploy *.json *.ts *.mjs *.md",
+    "setup": "node --import=tsx scripts/setup.ts",
+    "agent": "node --env-file-if-exists=.env.agent --import=tsx scripts/agents/cli.ts",
+    "gateway:check": "node --import=tsx scripts/gateway-check.ts",
+    "payments:inspect": "node --env-file-if-exists=.env.local --import=tsx scripts/payments-inspect.ts",
+    "backup": "node --env-file-if-exists=.env.local --import=tsx scripts/backup.ts",
+    "backup:verify": "node --import=tsx scripts/verify-backup.ts"
+  },
+  "dependencies": {
+    "@circle-fin/x402-batching": "^3.5.0",
+    "@mycelic/room-protocol": "file:packages/room-protocol",
+    "@tanstack/react-query": "^5.90.0",
+    "@x402/core": "^2.28.0",
+    "@x402/evm": "^2.28.0",
+    "next": "16.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "trystero": "0.26.0",
+    "tsx": "^4.23.15",
+    "viem": "^2.38.0",
+    "wagmi": "3.7.7",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/ws": "^8.18.2",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.4.0",
+    "prettier": "^3.6.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

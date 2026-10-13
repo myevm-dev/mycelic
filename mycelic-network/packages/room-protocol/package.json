@@ -1,0 +1,20 @@
+{
+  "name": "@mycelic/room-protocol",
+  "version": "0.6.1",
+  "private": true,
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "description": "Authenticated Mycelic Chat rooms and encrypted savepoints.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./chat": "./src/chat.ts",
+    "./trystero": "./src/trystero.ts",
+    "./crypto": "./src/crypto.ts"
+  },
+  "dependencies": {
+    "viem": "^2.38.0",
+    "zod": "^4.1.0",
+    "trystero": "0.26.0"
+  }
+}
