@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { NavigationLink } from "@/components/ui/NavigationLink";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -14,8 +15,15 @@ export function SiteHeader() {
   return (
     <header className="site-header shell">
       <NavigationLink href="/" className="brand" aria-label="Mycelic home">
-        <Icon name="nodes" />
-        <span>mycelic</span>
+        <Image
+          src="/mycelic-logo.png"
+          alt="Mycelic"
+          width={2048}
+          height={680}
+          sizes="(max-width: 520px) 120px, 170px"
+          className="brand-logo"
+          loading="eager"
+        />
       </NavigationLink>
       <nav aria-label="Main navigation">
         {[

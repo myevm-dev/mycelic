@@ -1905,3 +1905,20 @@ select {
     flex-basis: 100%;
   }
 }
+
+.site-header .brand-logo {
+  display: block;
+  width: 170px;
+  height: auto;
+}
+
+/* Darken the green for readability on light backgrounds. */
+html[data-theme="light"] .site-header .brand-logo {
+  filter: brightness(0.45);
+}
+
+@media (max-width: 520px) {
+  .site-header .brand-logo {
+    width: 120px;
+  }
+}
