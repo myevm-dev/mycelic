@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const config = publicPaymentConfig();
-    paymentStore().pinPolicy(config.policy);
+    await (await paymentStore()).pinPolicy(config.policy);
     return Response.json(config, {
       headers: { "Cache-Control": "no-store" },
     });

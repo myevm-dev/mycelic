@@ -69,35 +69,35 @@ describe("bounded request handling", () => {
   });
 });
 describe("durable admission and rate controls", () => {
-  it("enforces capacity, renewals, expiration and stale release across reopening", () => {
+  it("enforces capacity, renewals, expiration and stale release across reopening", async () => {
     const directory = mkdtempSync(join(tmpdir(), "mycelic-leases-"));
     let store: PaymentStore | undefined;
     try {
       const path = join(directory, "ledger.sqlite");
       store = new PaymentStore(path);
-      expect(store.acquireLease("room", "A", "old", 2, 1000)).toBe(true);
-      expect(store.acquireLease("room", "B", "b", 2, 1000)).toBe(true);
-      expect(store.acquireLease("room", "C", "c", 2, 1000)).toBe(false);
-      expect(store.acquireLease("room", "a", "new", 2, 2000)).toBe(true);
-      store.releaseLease("room", "A", "old");
-      expect(store.hasLease("room", "a", 3000)).toBe(true);
+      expect(await store.acquireLease("room", "A", "old", 2, 1000)).toBe(true);
+      expect(await store.acquireLease("room", "B", "b", 2, 1000)).toBe(true);
+      expect(await store.acquireLease("room", "C", "c", 2, 1000)).toBe(false);
+      expect(await store.acquireLease("room", "a", "new", 2, 2000)).toBe(true);
+      await store.releaseLease("room", "A", "old");
+      expect(await store.hasLease("room", "a", 3000)).toBe(true);
       store.db.close();
       store = new PaymentStore(path);
-      expect(store.leaseCount("room", 3000)).toBe(2);
-      expect(store.acquireLease("room", "C", "c", 2, 46000)).toBe(true);
-      expect(store.leaseCount("room", 46000)).toBe(2);
+      expect(await store.leaseCount("room", 3000)).toBe(2);
+      expect(await store.acquireLease("room", "C", "c", 2, 46000)).toBe(true);
+      expect(await store.leaseCount("room", 46000)).toBe(2);
     } finally {
       store?.db.close();
       rmSync(directory, { recursive: true, force: true });
     }
   });
-  it("isolates wallet rate windows and resets the next minute", () => {
+  it("isolates wallet rate windows and resets the next minute", async () => {
     const store = new PaymentStore(":memory:");
     try {
-      expect(store.rateLimit("A", "posts", 1, 1000)).toBe(true);
-      expect(store.rateLimit("a", "posts", 1, 2000)).toBe(false);
-      expect(store.rateLimit("B", "posts", 1, 2000)).toBe(true);
-      expect(store.rateLimit("A", "posts", 1, 61000)).toBe(true);
+      expect(await store.rateLimit("A", "posts", 1, 1000)).toBe(true);
+      expect(await store.rateLimit("a", "posts", 1, 2000)).toBe(false);
+      expect(await store.rateLimit("B", "posts", 1, 2000)).toBe(true);
+      expect(await store.rateLimit("A", "posts", 1, 61000)).toBe(true);
     } finally {
       store.db.close();
     }

@@ -1,6 +1,6 @@
 # Hosting and funded testing
 
-Use one long-running Node.js 24 instance with persistent writable storage. The application stores money records in SQLite; chat text and room keys stay with peers. Do not run multiple independent ledgers behind a load balancer. Shared multi-instance hosting requires a transactional shared database and coordinated admission first.
+Use Vercel with the transactional shared Firestore backend, or one long-running Node.js 24 instance with persistent SQLite storage. See [Firestore and Vercel setup](firestore.md) for credentials, security rules, migration and emulator tests. Firestore shares credits, intent reservations, nonces, rates and admission across server instances. Do not run multiple independent SQLite ledgers behind a load balancer. Chat text and room keys stay with peers.
 
 ## Container deployment
 
@@ -22,7 +22,9 @@ Configure DNS and ports 80/443. Supply reliable Nostr relays and STUN at build t
 
 Official clients admit at most eight wallet participants in a group and two in a direct room. Admission leases renew and expire after 45 seconds. A network outage closes official clients after the renewal grace period. One wallet counts as one admission slot; multiple tabs with that wallet can contend for it. Mesh limits apply to accepted application peers, not every transport connection a malicious client might attempt. Test capacity on phones and restrictive networks before increasing it.
 
-## Consistent private backups
+## Consistent private SQLite backups
+
+For Firestore, configure managed backups or exports and preserve the receipt signer in your secret manager. The commands below intentionally refuse Firestore instead of exporting an inconsistent live snapshot.
 
 Run in the configured service environment:
 

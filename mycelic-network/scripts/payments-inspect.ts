@@ -1,15 +1,13 @@
 import { paymentStore } from "../src/payments/store";
-import { PaymentService, type IntentRow } from "../src/payments/service";
+import { PaymentService } from "../src/payments/service";
 import { publicPaymentConfig, receiptSigner } from "../src/payments/config";
 import { CircleGatewayProvider } from "../src/payments/gateway";
-const store = paymentStore();
+const store = await paymentStore();
 const config = publicPaymentConfig();
-store.pinPolicy(config.policy);
-const rows = store.db
-  .prepare(
-    "SELECT * FROM intents WHERE status IN ('pending','failed') ORDER BY expires",
-  )
-  .all() as IntentRow[];
+await store.pinPolicy(config.policy);
+const rows = (await store.list("intents"))
+  .filter((row) => ["pending", "failed"].includes(row.status))
+  .sort((a, b) => a.expires - b.expires);
 if (process.argv.includes("--reconcile")) {
   const service = new PaymentService(
     store,
@@ -43,15 +41,22 @@ console.log(
     {
       environment: config.policy.environment,
       treasury: config.policy.treasury,
-      credits: store.db.prepare("SELECT wallet,amount FROM credits").all(),
-      intents: store.db
-        .prepare(
-          "SELECT id,owner,kind,amount,status,nonce,error FROM intents ORDER BY expires DESC LIMIT 100",
-        )
-        .all(),
+      credits: await store.list("credits"),
+      intents: (await store.list("intents"))
+        .sort((a, b) => b.expires - a.expires)
+        .slice(0, 100)
+        .map(({ id, owner, kind, amount, status, nonce, error }) => ({
+          id,
+          owner,
+          kind,
+          amount,
+          status,
+          nonce,
+          error,
+        })),
     },
     null,
     2,
   ),
 );
-store.db.close();
+await store.close();

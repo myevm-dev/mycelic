@@ -26,6 +26,8 @@ export default defineConfig({
     env: {
       NODE_OPTIONS: "--import=tsx --import=./e2e/gateway-fixture.ts",
       MYCELIC_PAYMENT_ENV: "testnet",
+      MYCELIC_STORAGE_BACKEND: "sqlite",
+      VERCEL: "",
       MYCELIC_RECEIPT_PRIVATE_KEY: generatePrivateKey(),
       MYCELIC_E2E_USE_PRODUCTION:
         process.env.MYCELIC_E2E_USE_PRODUCTION || "false",

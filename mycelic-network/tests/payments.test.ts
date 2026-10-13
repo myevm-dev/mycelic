@@ -139,7 +139,7 @@ describe("Gateway payments and posting ledger", () => {
     const f = await fixture();
     expect(f.challenge.status).toBe(402);
     expect(f.challenge.headers?.["PAYMENT-REQUIRED"]).toBeTruthy();
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     expect(f.gateway.settle).not.toHaveBeenCalled();
     f.store.db.close();
   });
@@ -150,9 +150,9 @@ describe("Gateway payments and posting ledger", () => {
       paymentHeader: f.header,
     });
     expect(result.status).toBe(200);
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     await f.service.purchase({ ...f.purchase, paymentHeader: f.header });
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     expect(f.gateway.settle).toHaveBeenCalledOnce();
     f.store.db.close();
   });
@@ -188,7 +188,7 @@ describe("Gateway payments and posting ledger", () => {
       ).rejects.toThrow();
     }
     expect(f.gateway.settle).not.toHaveBeenCalled();
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.store.db.close();
   });
   it("a payment nonce cannot fund a second intent", async () => {
@@ -207,7 +207,7 @@ describe("Gateway payments and posting ledger", () => {
         paymentHeader: Buffer.from(JSON.stringify(changed)).toString("base64"),
       }),
     ).rejects.toThrow("nonce");
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     f.store.db.close();
   });
   it("deducts each post once and rejects changed content using the same id", async () => {
@@ -222,7 +222,7 @@ describe("Gateway payments and posting ledger", () => {
     };
     const result = await f.service.post(post);
     await f.service.post(post);
-    expect(f.store.balance(f.wallet.address)).toBe(108000);
+    expect(await f.store.balance(f.wallet.address)).toBe(108000);
     await expect(
       f.service.post({ ...post, digest: `0x${"aa".repeat(32)}` }),
     ).rejects.toThrow("reused");
@@ -297,7 +297,7 @@ describe("Gateway payments and posting ledger", () => {
     await expect(
       f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
     ).rejects.toThrow("interrupted");
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.gateway.reconcile = vi.fn(async () => ({
       payer: f.wallet.address,
       to: TREASURY,
@@ -308,7 +308,7 @@ describe("Gateway payments and posting ledger", () => {
     }));
     const result = await f.service.purchase(f.purchase);
     expect(result.status).toBe(200);
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     expect(f.gateway.settle).toHaveBeenCalledOnce();
     f.store.db.close();
   });
@@ -324,7 +324,7 @@ describe("Gateway payments and posting ledger", () => {
       f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
     ).rejects.toThrow("pending");
     expect(f.gateway.settle).toHaveBeenCalledOnce();
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.store.db.close();
   });
   it("creation issues a verifiable authorization only after accepted payment", async () => {
@@ -395,7 +395,7 @@ describe("Gateway payments and posting ledger", () => {
       ),
     );
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(10);
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.store.db.close();
   });
 });
@@ -417,7 +417,7 @@ describe("durable credit recovery", () => {
         .run("room", "post", "digest", "receipt");
       store.db.close();
       const recovered = new PaymentStore(path);
-      expect(recovered.balance("wallet")).toBe(108000);
+      expect(await recovered.balance("wallet")).toBe(108000);
       expect(recovered.db.prepare("SELECT id FROM posts").get()).toEqual({
         id: "post",
       });
@@ -502,7 +502,7 @@ describe("payment recovery hardening", () => {
         f.purchase.url,
       );
       expect(f.gateway.settle).toHaveBeenCalledOnce();
-      expect(f.store.balance(f.wallet.address)).toBe(120000);
+      expect(await f.store.balance(f.wallet.address)).toBe(120000);
     } finally {
       f.store.db.close();
     }
@@ -510,11 +510,11 @@ describe("payment recovery hardening", () => {
   it("pins ledger identity and rejects changed receipt signers", async () => {
     const f = await fixture();
     try {
-      f.store.pinPolicy(f.room.payment!);
-      f.store.pinPolicy(f.room.payment!);
-      expect(() =>
+      await f.store.pinPolicy(f.room.payment!);
+      await f.store.pinPolicy(f.room.payment!);
+      await expect(
         f.store.pinPolicy({ ...f.room.payment!, issuer: f.wallet.address }),
-      ).toThrow("identity");
+      ).rejects.toThrow("identity");
     } finally {
       f.store.db.close();
     }

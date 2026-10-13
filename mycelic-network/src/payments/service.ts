@@ -9,7 +9,8 @@ import {
 } from "@/types/protocol";
 import { roomDigest } from "@mycelic/room-protocol";
 import { CREDIT_PACKS } from "./shared";
-import { type PaymentStore } from "./store";
+import { type PaymentLedger, type IntentRow, postKey } from "./ledger";
+export type { IntentRow } from "./ledger";
 import { type GatewayProvider, validateGatewayPayload } from "./gateway";
 export class HttpError extends Error {
   constructor(
@@ -26,22 +27,9 @@ export type ApiResult = {
   body: unknown;
   headers?: Record<string, string>;
 };
-export type IntentRow = {
-  id: string;
-  owner: string;
-  kind: "create" | "credits";
-  data: string;
-  amount: string;
-  expires: number;
-  status: string;
-  nonce: string | null;
-  payload: string | null;
-  result: string | null;
-  error: string | null;
-};
 export class PaymentService {
   constructor(
-    readonly store: PaymentStore,
+    readonly store: PaymentLedger,
     readonly policy: PaymentPolicy,
     readonly signer: PrivateKeyAccount,
     readonly gateway: GatewayProvider,
@@ -61,17 +49,14 @@ export class PaymentService {
     url: string;
     paymentHeader?: string;
   }): Promise<ApiResult> {
-    const row = this.store.transaction(() => {
-      const get = () =>
-        this.store.db
-          .prepare("SELECT * FROM intents WHERE id=?")
-          .get(args.id) as IntentRow | undefined;
-      let current = get();
+    const row = await this.store.transaction(async (tx) => {
+      let current = await tx.get("intents", args.id);
+      const definition = canonical(args.data);
       if (
         current &&
         (current.owner !== args.wallet.toLowerCase() ||
           current.kind !== args.kind ||
-          current.data !== canonical(args.data) ||
+          current.data !== definition ||
           current.amount !== args.amount)
       )
         throw new HttpError(
@@ -80,17 +65,16 @@ export class PaymentService {
         );
       if (args.kind === "create" && !current?.nonce && !current?.result) {
         const room = (args.data as { room: RoomDefinition }).room;
-        const claim = this.store.db
-          .prepare(
-            "SELECT i.* FROM creation_claims c JOIN intents i ON i.id=c.intent WHERE c.room=?",
-          )
-          .get(room.hash) as IntentRow | undefined;
+        const reservation = await tx.get("creation_claims", room.hash);
+        const claim = reservation
+          ? await tx.get("intents", reservation.intent)
+          : undefined;
         if (claim && claim.owner !== args.wallet.toLowerCase())
           throw new HttpError(
             409,
             "Room creation is reserved by another owner",
           );
-        if (claim && claim.data !== canonical(args.data))
+        if (claim && claim.data !== definition)
           throw new HttpError(
             409,
             "Room hash already has a different pending definition",
@@ -101,13 +85,9 @@ export class PaymentService {
           (["failed", "expired"].includes(claim.status) ||
             (claim.status === "ready" && claim.expires < Date.now()))
         ) {
-          this.store.db
-            .prepare("DELETE FROM creation_claims WHERE room=?")
-            .run(room.hash);
+          tx.delete("creation_claims", room.hash);
           if (claim.status === "ready")
-            this.store.db
-              .prepare("UPDATE intents SET status='expired' WHERE id=?")
-              .run(claim.id);
+            tx.set("intents", claim.id, { ...claim, status: "expired" });
         } else if (claim && claim.id !== args.id)
           throw new HttpError(
             409,
@@ -117,25 +97,29 @@ export class PaymentService {
           );
       }
       if (!current) {
-        this.store.db
-          .prepare(
-            "INSERT INTO intents(id,owner,kind,data,amount,expires) VALUES(?,?,?,?,?,?)",
-          )
-          .run(
-            args.id,
-            args.wallet.toLowerCase(),
-            args.kind,
-            canonical(args.data),
-            args.amount,
-            Date.now() + 15 * 60 * 1000,
-          );
-        if (args.kind === "create")
-          this.store.db
-            .prepare("INSERT INTO creation_claims(room,intent) VALUES(?,?)")
-            .run((args.data as { room: RoomDefinition }).room.hash, args.id);
-        current = get();
+        current = {
+          id: args.id,
+          owner: args.wallet.toLowerCase(),
+          kind: args.kind,
+          data: definition,
+          amount: args.amount,
+          expires: Date.now() + 15 * 60 * 1000,
+          status: "ready",
+          nonce: null,
+          payload: null,
+          result: null,
+          error: null,
+        };
+        tx.set("intents", args.id, current);
+        if (args.kind === "create") {
+          const room = (args.data as { room: RoomDefinition }).room;
+          tx.set("creation_claims", room.hash, {
+            room: room.hash,
+            intent: args.id,
+          });
+        }
       }
-      return current!;
+      return current;
     });
     if (row.result) return { status: 200, body: JSON.parse(row.result) };
     if (row.status === "expired")
@@ -201,11 +185,7 @@ export class PaymentService {
         };
       }
       if (accepted?.status === "failed") {
-        this.store.db
-          .prepare(
-            "UPDATE intents SET status='failed',error='Gateway confirmed failed transfer' WHERE id=? AND result IS NULL",
-          )
-          .run(row.id);
+        await this.failIntent(row.id, "Gateway confirmed failed transfer");
         throw new HttpError(
           402,
           "Gateway confirmed that this transfer failed. No credit issued.",
@@ -272,25 +252,47 @@ export class PaymentService {
       resource,
     );
     try {
-      const assigned = this.store.db
-        .prepare(
-          "UPDATE intents SET nonce=?,payload=?,status='pending' WHERE id=? AND nonce IS NULL AND result IS NULL",
+      await this.store.transaction(async (tx) => {
+        const current = await tx.get("intents", row.id);
+        const nonce = payload.payload.authorization.nonce.toLowerCase();
+        const assignment = await tx.get("nonces", nonce);
+        if (
+          !current ||
+          current.nonce ||
+          current.result ||
+          current.status !== "ready"
         )
-        .run(
-          payload.payload.authorization.nonce.toLowerCase(),
-          JSON.stringify({ payload, selected }),
-          row.id,
-        );
-      if (!assigned.changes)
-        throw new HttpError(
-          409,
-          "Payment already in progress; retry the same operation",
-        );
+          throw new HttpError(
+            409,
+            "Payment already in progress; retry the same operation",
+          );
+        if (current.expires < Date.now())
+          throw new HttpError(
+            410,
+            "Unpaid payment intent expired",
+            "intent_expired",
+          );
+        if (assignment)
+          throw new HttpError(
+            409,
+            "Payment nonce is already assigned to an operation",
+          );
+        tx.set("nonces", nonce, { nonce, intent: row.id });
+        tx.set("intents", row.id, {
+          ...current,
+          nonce,
+          payload: JSON.stringify({ payload, selected }),
+          status: "pending",
+        });
+      });
     } catch (error) {
       if (error instanceof HttpError) throw error;
+      // A failed/uncertain database commit must never trigger Gateway submission.
       throw new HttpError(
-        409,
-        "Payment nonce is already assigned to an operation",
+        503,
+        "Payment ledger unavailable. Retry the same operation before authorizing another payment.",
+        "ledger_unavailable",
+        { intentId: row.id },
       );
     }
     let settlement;
@@ -320,14 +322,10 @@ export class PaymentService {
           "payment_pending",
           { intentId: row.id },
         );
-      this.store.db
-        .prepare(
-          "UPDATE intents SET status='failed',error=? WHERE id=? AND result IS NULL",
-        )
-        .run(
-          settlement.errorReason || "Gateway rejected authorization",
-          row.id,
-        );
+      await this.failIntent(
+        row.id,
+        settlement.errorReason || "Gateway rejected authorization",
+      );
       throw new HttpError(
         402,
         `Gateway rejected payment: ${settlement.errorReason || "unknown reason"}. No credit issued. Keep the intent ID for support.`,
@@ -371,55 +369,69 @@ export class PaymentService {
           issuedAt: Date.now(),
         })
       : undefined;
-    return this.store.transaction(() => {
-      const current = this.store.db
-        .prepare("SELECT result FROM intents WHERE id=?")
-        .get(row.id) as { result: string | null };
+    return this.store.transaction(async (tx) => {
+      const current = await tx.get("intents", row.id);
+      if (!current) throw new HttpError(404, "Payment intent not found");
       if (current.result) return JSON.parse(current.result);
+      if (!current.nonce || current.status !== "pending")
+        throw new HttpError(409, "Payment is not pending acceptance");
       let result: unknown;
       if (room) {
-        const existing = this.store.db
-          .prepare("SELECT definition FROM rooms WHERE hash=?")
-          .get(room.hash) as { definition: string } | undefined;
+        const existing = await tx.get("rooms", room.hash);
         if (existing && existing.definition !== canonical(room))
           throw new HttpError(
             409,
             "Room hash already belongs to another definition",
           );
-        this.store.db
-          .prepare(
-            "INSERT OR IGNORE INTO rooms(hash,definition,receipt) VALUES(?,?,?)",
-          )
-          .run(room.hash, canonical(room), JSON.stringify(receipt));
-        result = { created: true, creationReceipt: receipt };
+        if (!existing)
+          tx.set("rooms", room.hash, {
+            hash: room.hash,
+            definition: canonical(room),
+            receipt: JSON.stringify(receipt),
+          });
+        result = {
+          created: true,
+          creationReceipt: existing ? JSON.parse(existing.receipt) : receipt,
+        };
       } else {
-        this.store.db
-          .prepare(
-            "INSERT INTO credits(wallet,amount) VALUES(?,?) ON CONFLICT(wallet) DO UPDATE SET amount=amount+excluded.amount",
-          )
-          .run(row.owner, Number(row.amount));
-        result = { purchased: true, balance: this.store.balance(row.owner) };
+        const balance = (await tx.get("credits", row.owner))?.amount || 0;
+        const next = balance + Number(row.amount);
+        if (!Number.isSafeInteger(next))
+          throw new HttpError(409, "Credit balance exceeds supported range");
+        tx.set("credits", row.owner, { wallet: row.owner, amount: next });
+        result = { purchased: true, balance: next };
       }
-      this.store.db
-        .prepare("UPDATE intents SET status='accepted',result=? WHERE id=?")
-        .run(JSON.stringify(result), row.id);
+      tx.set("intents", row.id, {
+        ...current,
+        status: "accepted",
+        result: JSON.stringify(result),
+      });
       return result;
     });
   }
+  private async failIntent(id: string, error: string) {
+    await this.store.transaction(async (tx) => {
+      const current = await tx.get("intents", id);
+      if (current && !current.result)
+        tx.set("intents", id, { ...current, status: "failed", error });
+    });
+  }
   async paymentStatus(wallet: string, id: string, url: string) {
-    let row = this.store.db
-      .prepare("SELECT * FROM intents WHERE id=?")
-      .get(id) as IntentRow | undefined;
-    if (!row || row.owner !== wallet.toLowerCase())
-      throw new HttpError(404, "Payment intent not found");
-    if (row.status === "ready" && row.expires < Date.now()) {
-      this.store.db
-        .prepare(
-          "UPDATE intents SET status='expired' WHERE id=? AND nonce IS NULL",
-        )
-        .run(row.id);
-      row = { ...row, status: "expired" };
-    }
+    let row = await this.store.transaction(async (tx) => {
+      const current = await tx.get("intents", id);
+      if (!current || current.owner !== wallet.toLowerCase())
+        throw new HttpError(404, "Payment intent not found");
+      if (
+        current.status === "ready" &&
+        current.expires < Date.now() &&
+        !current.nonce
+      ) {
+        const expired = { ...current, status: "expired" };
+        tx.set("intents", id, expired);
+        return expired;
+      }
+      return current;
+    });
     let recoveryError: string | undefined;
     if (row.status === "pending") {
       try {
@@ -435,16 +447,14 @@ export class PaymentService {
         recoveryError =
           error instanceof Error ? error.message : "Recovery unavailable";
       }
-      row = this.store.db
-        .prepare("SELECT * FROM intents WHERE id=?")
-        .get(id) as IntentRow;
+      row = (await this.store.get("intents", id))!;
     }
     return {
       id: row.id,
       kind: row.kind,
       amount: row.amount,
       status: row.status,
-      balance: this.store.balance(wallet),
+      balance: await this.store.balance(wallet),
       ...(row.result ? { result: JSON.parse(row.result) } : {}),
       ...(recoveryError || row.error
         ? { error: recoveryError || row.error }
@@ -478,11 +488,11 @@ export class PaymentService {
       amount: this.policy.postAmount,
       issuedAt: Date.now(),
     });
-    return this.store.transaction(() => {
-      const existing = this.store.db
-        .prepare("SELECT digest,receipt FROM posts WHERE room=? AND id=?")
-        .get(args.room.hash, args.messageId) as
-        { digest: string; receipt: string } | undefined;
+    return this.store.transaction(async (tx) => {
+      const key = postKey(args.room.hash, args.messageId);
+      const existing = await tx.get("posts", key);
+      const wallet = args.wallet.toLowerCase();
+      const balance = (await tx.get("credits", wallet))?.amount || 0;
       if (existing) {
         const paid = JSON.parse(existing.receipt) as PaymentReceipt;
         if (
@@ -494,31 +504,22 @@ export class PaymentService {
             409,
             "Message ID cannot be reused for different content or identity",
           );
-        return { receipt: paid, balance: this.store.balance(args.wallet) };
+        return { receipt: paid, balance };
       }
-      const deducted = this.store.db
-        .prepare(
-          "UPDATE credits SET amount=amount-? WHERE wallet=? AND amount>=?",
-        )
-        .run(
-          Number(this.policy.postAmount),
-          args.wallet.toLowerCase(),
-          Number(this.policy.postAmount),
-        );
-      if (!deducted.changes)
+      const amount = Number(this.policy.postAmount);
+      if (balance < amount)
         throw new HttpError(
           402,
           "Posting credits exhausted. Purchase a pack before posting.",
         );
-      this.store.db
-        .prepare("INSERT INTO posts(room,id,digest,receipt) VALUES(?,?,?,?)")
-        .run(
-          args.room.hash,
-          args.messageId,
-          args.digest,
-          JSON.stringify(receipt),
-        );
-      return { receipt, balance: this.store.balance(args.wallet) };
+      tx.set("credits", wallet, { wallet, amount: balance - amount });
+      tx.set("posts", key, {
+        room: args.room.hash,
+        id: args.messageId,
+        digest: args.digest,
+        receipt: JSON.stringify(receipt),
+      });
+      return { receipt, balance: balance - amount };
     });
   }
 }

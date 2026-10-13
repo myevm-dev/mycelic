@@ -5,9 +5,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const config = publicPaymentConfig();
-    const store = paymentStore();
-    store.pinPolicy(config.policy);
-    store.db.prepare("SELECT 1").get();
+    const store = await paymentStore();
+    await store.pinPolicy(config.policy);
+    await store.get("settings", "payment-policy");
     return Response.json(
       {
         status: config.enabled ? "ready" : "payments_disabled",
@@ -27,8 +27,7 @@ export async function GET() {
     return Response.json(
       {
         status: "not_ready",
-        error:
-          "Check receipt key, ledger identity and persistent storage configuration.",
+        error: "Check receipt key, ledger identity and database configuration.",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );

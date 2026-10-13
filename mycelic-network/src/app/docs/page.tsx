@@ -56,15 +56,16 @@ export default function ChatHelp() {
         </p>
         <h2 id="status">Deployment and limits</h2>
         <p>
-          The app needs a persistent disk for its SQLite payment ledger and
-          receipt key. Chat is designed for small rooms and has been exercised
-          with two browser peers. TURN may be needed on restrictive networks.
-          WebRTC can expose peer IP addresses. Protect room links: their
-          fragments contain the room key.
+          The payment service uses a shared Firestore ledger on Vercel, or
+          SQLite on a server with persistent disk. The receipt key stays in
+          server secret configuration. Chat is designed for small rooms and has
+          been exercised with two browser peers. TURN may be needed on
+          restrictive networks. WebRTC can expose peer IP addresses. Protect
+          room links: their fragments contain the room key.
         </p>
         <p>
-          Mycelic Games and Mycelic Voice are coming soon. Mainnet payments
-          remain disabled by default.
+          Mycelic Games, Mycelic Voice and Mycelic Forum are coming soon.
+          Mainnet payments remain disabled by default.
         </p>
         <NavigationLink className="text-link" href="/chat">
           Open Mycelic Chat →
