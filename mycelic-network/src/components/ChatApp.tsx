@@ -606,11 +606,7 @@ export function ChatApp() {
               </div>
             </section>
           </div>
-          <footer>
-            Payment receipts and room metadata use a persistent ledger. Chat
-            text and room keys are never sent to that ledger. Mycelic Games and
-            Voice are coming soon.
-          </footer>
+
         </>
       )}
     </main>

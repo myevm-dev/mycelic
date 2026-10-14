@@ -7,7 +7,7 @@ export function SiteFooter() {
         <Icon name="nodes" />
         Mycelic
       </NavigationLink>
-      <span>Talk now. Games and voice next.</span>
+      
       <NavigationLink href="/docs">Chat help</NavigationLink>
     </footer>
   );

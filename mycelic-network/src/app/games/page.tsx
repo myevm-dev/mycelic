@@ -15,15 +15,12 @@ export default function GamesPage() {
           <h1>
             Play together.
             <br />
-            <span className="accent-text">One room at a time.</span>
+            <span className="accent-text">Coming Soon.</span>
           </h1>
           <p className="page-lede">
             Small multiplayer games, shared rooms and friendly competition.
           </p>
-          <p>
-            We are starting with chat. Games will follow with a first turn-based
-            game, clear room limits and reconnectable matches.
-          </p>
+          
           <div className="hero-actions">
             <NavigationLink href="/chat" className="button primary">
               Try Mycelic Chat

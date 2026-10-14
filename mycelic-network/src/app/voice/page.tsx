@@ -14,16 +14,12 @@ export default function VoicePage() {
           <h1>
             A room to talk.
             <br />
-            <span className="accent-text">Just for now.</span>
+            <span className="accent-text">Coming Soon.</span>
           </h1>
           <p className="page-lede">
             Temporary voice channels for friends, teams, and game nights.
           </p>
-          <p>
-            Voice calls are planned. Room access, payment controls, connection
-            limits, and privacy behavior will be defined before launch. No voice
-            calling is available yet.
-          </p>
+
           <div className="hero-actions">
             <NavigationLink href="/chat" className="button primary">
               Open Mycelic Chat

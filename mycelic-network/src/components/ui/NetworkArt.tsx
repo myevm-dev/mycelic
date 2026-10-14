@@ -70,7 +70,7 @@ export function NetworkArt() {
       </div>
       <span className="art-label manifest-label">YOUR ROOM</span>
       <span className="art-caption">
-        Chat now <span>·</span> Games coming soon
+        Secure <span>·</span> WebRTC Chat
       </span>
     </div>
   );
