@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { paymentPolicySchema } from "@/types/protocol";
-export const TREASURY = "0x1f89928f6694dbd02fe77f9fdd7094a774f6d329" as const;
+export const TREASURY = "0x183603E3bF84348c1B7774601D266d4FF7d114c3" as const;
 export const SELF_TRANSFER_MESSAGE =
   "Circle Gateway cannot pay a wallet to itself. Connect a payer wallet different from the payment treasury.";
 export const CREATE_AMOUNT = "3000000";
