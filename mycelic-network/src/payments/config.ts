@@ -12,7 +12,7 @@ export function receiptPrivateKey(): Hex {
   let key = process.env.MYCELIC_RECEIPT_PRIVATE_KEY;
 
   if (!key) {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
       throw new Error(
         "Configure MYCELIC_RECEIPT_PRIVATE_KEY before enabling production payments",
       );

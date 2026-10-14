@@ -139,7 +139,7 @@ describe("Gateway payments and posting ledger", () => {
     const f = await fixture();
     expect(f.challenge.status).toBe(402);
     expect(f.challenge.headers?.["PAYMENT-REQUIRED"]).toBeTruthy();
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     expect(f.gateway.settle).not.toHaveBeenCalled();
     f.store.db.close();
   });
@@ -150,9 +150,9 @@ describe("Gateway payments and posting ledger", () => {
       paymentHeader: f.header,
     });
     expect(result.status).toBe(200);
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     await f.service.purchase({ ...f.purchase, paymentHeader: f.header });
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     expect(f.gateway.settle).toHaveBeenCalledOnce();
     f.store.db.close();
   });
@@ -188,7 +188,7 @@ describe("Gateway payments and posting ledger", () => {
       ).rejects.toThrow();
     }
     expect(f.gateway.settle).not.toHaveBeenCalled();
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.store.db.close();
   });
   it("a payment nonce cannot fund a second intent", async () => {
@@ -207,7 +207,7 @@ describe("Gateway payments and posting ledger", () => {
         paymentHeader: Buffer.from(JSON.stringify(changed)).toString("base64"),
       }),
     ).rejects.toThrow("nonce");
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     f.store.db.close();
   });
   it("deducts each post once and rejects changed content using the same id", async () => {
@@ -222,7 +222,7 @@ describe("Gateway payments and posting ledger", () => {
     };
     const result = await f.service.post(post);
     await f.service.post(post);
-    expect(f.store.balance(f.wallet.address)).toBe(108000);
+    expect(await f.store.balance(f.wallet.address)).toBe(108000);
     await expect(
       f.service.post({ ...post, digest: `0x${"aa".repeat(32)}` }),
     ).rejects.toThrow("reused");
@@ -297,7 +297,7 @@ describe("Gateway payments and posting ledger", () => {
     await expect(
       f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
     ).rejects.toThrow("interrupted");
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.gateway.reconcile = vi.fn(async () => ({
       payer: f.wallet.address,
       to: TREASURY,
@@ -308,7 +308,7 @@ describe("Gateway payments and posting ledger", () => {
     }));
     const result = await f.service.purchase(f.purchase);
     expect(result.status).toBe(200);
-    expect(f.store.balance(f.wallet.address)).toBe(120000);
+    expect(await f.store.balance(f.wallet.address)).toBe(120000);
     expect(f.gateway.settle).toHaveBeenCalledOnce();
     f.store.db.close();
   });
@@ -324,7 +324,7 @@ describe("Gateway payments and posting ledger", () => {
       f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
     ).rejects.toThrow("pending");
     expect(f.gateway.settle).toHaveBeenCalledOnce();
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.store.db.close();
   });
   it("creation issues a verifiable authorization only after accepted payment", async () => {
@@ -395,7 +395,7 @@ describe("Gateway payments and posting ledger", () => {
       ),
     );
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(10);
-    expect(f.store.balance(f.wallet.address)).toBe(0);
+    expect(await f.store.balance(f.wallet.address)).toBe(0);
     f.store.db.close();
   });
 });
@@ -417,7 +417,7 @@ describe("durable credit recovery", () => {
         .run("room", "post", "digest", "receipt");
       store.db.close();
       const recovered = new PaymentStore(path);
-      expect(recovered.balance("wallet")).toBe(108000);
+      expect(await recovered.balance("wallet")).toBe(108000);
       expect(recovered.db.prepare("SELECT id FROM posts").get()).toEqual({
         id: "post",
       });
@@ -502,7 +502,7 @@ describe("payment recovery hardening", () => {
         f.purchase.url,
       );
       expect(f.gateway.settle).toHaveBeenCalledOnce();
-      expect(f.store.balance(f.wallet.address)).toBe(120000);
+      expect(await f.store.balance(f.wallet.address)).toBe(120000);
     } finally {
       f.store.db.close();
     }
@@ -510,13 +510,196 @@ describe("payment recovery hardening", () => {
   it("pins ledger identity and rejects changed receipt signers", async () => {
     const f = await fixture();
     try {
-      f.store.pinPolicy(f.room.payment!);
-      f.store.pinPolicy(f.room.payment!);
-      expect(() =>
+      await f.store.pinPolicy(f.room.payment!);
+      await f.store.pinPolicy(f.room.payment!);
+      await expect(
         f.store.pinPolicy({ ...f.room.payment!, issuer: f.wallet.address }),
-      ).toThrow("identity");
+      ).rejects.toThrow("identity");
     } finally {
       f.store.db.close();
+    }
+  });
+});
+
+describe("Gateway rejection handling", () => {
+  it("blocks a new self-transfer before reserving an intent or requesting payment", async () => {
+    const f = await fixture();
+    try {
+      f.service.policy.treasury = f.wallet.address;
+      await expect(
+        f.service.purchase({ ...f.purchase, id: crypto.randomUUID() }),
+      ).rejects.toMatchObject({ code: "payment_self_transfer" });
+      expect(await f.store.list("intents")).toHaveLength(1);
+      expect(f.gateway.settle).not.toHaveBeenCalled();
+      expect(await f.store.balance(f.wallet.address)).toBe(0);
+    } finally {
+      await f.store.close();
+    }
+  });
+  it("blocks a browser self-transfer before asking the wallet for its payment signature", async () => {
+    const f = await fixture();
+    try {
+      const { signGatewayChallenge } = await import("@/payments/client");
+      const signTypedData = vi.fn();
+      const config = CHAIN_CONFIGS.arcTestnet;
+      await expect(
+        signGatewayChallenge(
+          f.challenge.body as Parameters<typeof signGatewayChallenge>[0],
+          {
+            policy: f.service.policy,
+            enabled: true,
+            preferredChain: "arcTestnet",
+            maxParticipants: 8,
+            networks: [
+              {
+                key: "arcTestnet",
+                name: config.chain.name,
+                chainId: config.chain.id,
+                domain: config.domain,
+                usdc: config.usdc,
+                gatewayWallet: config.gatewayWallet,
+                rpc: config.chain.rpcUrls.default.http[0],
+              },
+            ],
+          },
+          { address: TREASURY, signTypedData },
+          "arcTestnet",
+          "120000",
+        ),
+      ).rejects.toThrow("wallet to itself");
+      expect(signTypedData).not.toHaveBeenCalled();
+    } finally {
+      await f.store.close();
+    }
+  });
+  it("recovers an old pending self-transfer without another settlement and retains its nonce", async () => {
+    const f = await fixture();
+    try {
+      f.service.policy.treasury = f.wallet.address;
+      const selected = {
+        ...(f.challenge.body as { accepts: PaymentRequirements[] }).accepts[0],
+        payTo: f.wallet.address,
+      };
+      const signed = await new BatchEvmScheme(f.wallet).createPaymentPayload(
+        2,
+        selected,
+      );
+      const payload = {
+        ...signed,
+        accepted: selected,
+        resource: (f.challenge.body as { resource: GatewayPayload["resource"] })
+          .resource,
+      };
+      const nonce = signed.payload.authorization.nonce.toLowerCase();
+      await f.store.transaction(async (tx) => {
+        const current = (await tx.get("intents", f.purchase.id))!;
+        tx.set("intents", current.id, {
+          ...current,
+          status: "pending",
+          nonce,
+          payload: JSON.stringify({ payload, selected }),
+        });
+        tx.set("nonces", nonce, { nonce, intent: current.id });
+      });
+      await expect(f.service.purchase(f.purchase)).rejects.toMatchObject({
+        code: "payment_self_transfer",
+      });
+      expect(await f.store.get("intents", f.purchase.id)).toMatchObject({
+        status: "failed",
+        error: "self_transfer",
+        result: null,
+      });
+      expect(await f.store.get("nonces", nonce)).toMatchObject({
+        intent: f.purchase.id,
+      });
+      expect(f.gateway.reconcile).toHaveBeenCalledOnce();
+      expect(f.gateway.settle).not.toHaveBeenCalled();
+      expect(await f.store.balance(f.wallet.address)).toBe(0);
+    } finally {
+      await f.store.close();
+    }
+  });
+  it.each([
+    "insufficient_balance",
+    "authorization_expired",
+    "authorization_validity_too_short",
+    "self_transfer",
+    "unsupported_network",
+  ])(
+    "records definitive rejection %s instead of leaving it pending",
+    async (reason) => {
+      const f = await fixture();
+      try {
+        f.gateway.settle = vi.fn(async () => ({
+          success: false,
+          errorReason: reason,
+          transaction: "",
+          network: "eip155:5042002",
+        }));
+        await expect(
+          f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
+        ).rejects.toMatchObject({
+          code:
+            reason === "self_transfer"
+              ? "payment_self_transfer"
+              : "payment_rejected",
+        });
+        expect(await f.store.get("intents", f.purchase.id)).toMatchObject({
+          status: "failed",
+          error: reason,
+          result: null,
+        });
+        expect(await f.store.balance(f.wallet.address)).toBe(0);
+      } finally {
+        await f.store.close();
+      }
+    },
+  );
+  it.each(["nonce_already_used", "unexpected_error", "unrecognized_reason"])(
+    "keeps uncertain rejection %s pending and records the reason",
+    async (reason) => {
+      const f = await fixture();
+      try {
+        f.gateway.settle = vi.fn(async () => ({
+          success: false,
+          errorReason: reason,
+          transaction: "",
+          network: "eip155:5042002",
+        }));
+        await expect(
+          f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
+        ).rejects.toMatchObject({ code: "payment_pending" });
+        expect(await f.store.get("intents", f.purchase.id)).toMatchObject({
+          status: "pending",
+          error: `Gateway: ${reason}`,
+          result: null,
+        });
+        await expect(f.service.purchase(f.purchase)).rejects.toMatchObject({
+          code: "payment_pending",
+        });
+        expect(f.gateway.settle).toHaveBeenCalledOnce();
+      } finally {
+        await f.store.close();
+      }
+    },
+  );
+  it("keeps a response with a transfer identifier pending even if its reason looks definitive", async () => {
+    const f = await fixture();
+    try {
+      f.gateway.settle = vi.fn(async () => ({
+        success: false,
+        errorReason: "insufficient_balance",
+        transaction: "existing-transfer",
+        network: "eip155:5042002",
+      }));
+      await expect(
+        f.service.purchase({ ...f.purchase, paymentHeader: f.header }),
+      ).rejects.toMatchObject({ code: "payment_pending" });
+      expect((await f.store.get("intents", f.purchase.id))?.status).toBe(
+        "pending",
+      );
+    } finally {
+      await f.store.close();
     }
   });
 });

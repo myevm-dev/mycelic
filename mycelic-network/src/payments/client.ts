@@ -3,7 +3,11 @@ import {
   CHAIN_CONFIGS,
 } from "@circle-fin/x402-batching/client";
 import { canonical } from "@/types/protocol";
-import { requirementSchema, type PublicPaymentConfig } from "./shared";
+import {
+  requirementSchema,
+  SELF_TRANSFER_MESSAGE,
+  type PublicPaymentConfig,
+} from "./shared";
 export type PaymentSigner = ConstructorParameters<typeof BatchEvmScheme>[0];
 export type PaymentRequired = {
   x402Version: 2;
@@ -36,6 +40,8 @@ export async function signGatewayChallenge(
     throw new Error(
       "Payment challenge does not match the displayed treasury, amount or network",
     );
+  if (signer.address.toLowerCase() === selected.payTo.toLowerCase())
+    throw new Error(SELF_TRANSFER_MESSAGE);
   const payload = await new BatchEvmScheme(signer).createPaymentPayload(
     2,
     selected,

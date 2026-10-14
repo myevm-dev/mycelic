@@ -3,15 +3,53 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { canonical, type PaymentPolicy } from "@/types/protocol";
 import { dataDirectory } from "./config";
-/** Persistent money ledger and public room metadata only. Never stores chat text or room secrets. */
-export class PaymentStore {
+import {
+  PaymentLedger,
+  identityError,
+  type LedgerCollection,
+  type LedgerRecords,
+  type LedgerTransaction,
+} from "./ledger";
+
+const tables: Record<LedgerCollection, { keys: string[]; fields: string[] }> = {
+  rooms: { keys: ["hash"], fields: ["hash", "definition", "receipt"] },
+  credits: { keys: ["wallet"], fields: ["wallet", "amount"] },
+  posts: { keys: ["room", "id"], fields: ["room", "id", "digest", "receipt"] },
+  intents: {
+    keys: ["id"],
+    fields: [
+      "id",
+      "owner",
+      "kind",
+      "data",
+      "amount",
+      "expires",
+      "status",
+      "nonce",
+      "payload",
+      "result",
+      "error",
+    ],
+  },
+  creation_claims: { keys: ["room"], fields: ["room", "intent"] },
+  nonces: { keys: ["nonce"], fields: ["nonce", "intent"] },
+  settings: { keys: ["name"], fields: ["name", "value"] },
+  room_leases: { keys: ["room"], fields: ["room", "members"] },
+  rate_windows: { keys: ["bucket"], fields: ["bucket", "window", "count"] },
+};
+
+/** SQLite remains available for local development and a single persistent Node server. */
+export class PaymentStore extends PaymentLedger {
+  readonly backend = "sqlite" as const;
   readonly db: DatabaseSync;
+  private queue: Promise<unknown> = Promise.resolve();
   constructor(
     path = join(
       dataDirectory(),
       `mycelic-${process.env.MYCELIC_PAYMENT_ENV === "mainnet" ? "mainnet" : "testnet"}.sqlite`,
     ),
   ) {
+    super();
     if (path !== ":memory:")
       mkdirSync(dataDirectory(), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(path);
@@ -24,121 +62,139 @@ export class PaymentStore {
       CREATE TABLE IF NOT EXISTS settings(name TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS creation_claims(room TEXT PRIMARY KEY,intent TEXT UNIQUE NOT NULL);
       CREATE TABLE IF NOT EXISTS leases(room TEXT NOT NULL,actor TEXT NOT NULL,lease TEXT NOT NULL,expires INTEGER NOT NULL,PRIMARY KEY(room,actor));
+      CREATE TABLE IF NOT EXISTS room_leases(room TEXT PRIMARY KEY,members TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS nonces(nonce TEXT PRIMARY KEY,intent TEXT UNIQUE NOT NULL);
       CREATE TABLE IF NOT EXISTS rate_windows(bucket TEXT PRIMARY KEY,window INTEGER NOT NULL,count INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS leases_expiry ON leases(expires);
       CREATE INDEX IF NOT EXISTS intent_expiry ON intents(expires);
+      INSERT OR IGNORE INTO nonces(nonce,intent) SELECT lower(nonce),id FROM intents WHERE nonce IS NOT NULL;
       INSERT OR IGNORE INTO creation_claims(room,intent) SELECT json_extract(data,'$.room.hash'),id FROM intents WHERE kind='create' AND status IN ('ready','pending','accepted') ORDER BY expires;
+      INSERT OR IGNORE INTO room_leases(room,members) SELECT room,json_group_object(actor,json_object('lease',lease,'expires',expires)) FROM leases GROUP BY room;
+      DELETE FROM leases;
     `);
   }
-  transaction<T>(fn: () => T): T {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = fn();
-      this.db.exec("COMMIT");
-      return result;
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
-    }
+  private read<C extends LedgerCollection>(
+    collection: C,
+    key: string,
+  ): LedgerRecords[C] | undefined {
+    const spec = tables[collection];
+    const values =
+      collection === "posts" ? (JSON.parse(key) as string[]) : [key];
+    const row = this.db
+      .prepare(
+        `SELECT * FROM ${collection} WHERE ${spec.keys.map((k) => `${k}=?`).join(" AND ")}`,
+      )
+      .get(...values);
+    if (row && collection === "room_leases")
+      row.members = JSON.parse(row.members as string);
+    return row as LedgerRecords[C] | undefined;
   }
-  pinPolicy(policy: PaymentPolicy) {
-    this.transaction(() => {
+  async transaction<T>(fn: (tx: LedgerTransaction) => Promise<T>): Promise<T> {
+    const operation = this.queue.then(async () => {
+      this.db.exec("BEGIN IMMEDIATE");
+      try {
+        const result = await fn({
+          get: async (collection, key) => this.read(collection, key),
+          set: (collection, _key, record) => {
+            const { keys, fields } = tables[collection];
+            const values = fields.map((field) => {
+              const value = (
+                record as unknown as Record<string, string | number | null>
+              )[field];
+              return field === "members" ? JSON.stringify(value) : value;
+            });
+            this.db
+              .prepare(
+                `INSERT INTO ${collection}(${fields.join(",")}) VALUES(${fields.map(() => "?").join(",")}) ON CONFLICT(${keys.join(",")}) DO UPDATE SET ${fields
+                  .filter((f) => !keys.includes(f))
+                  .map((f) => `${f}=excluded.${f}`)
+                  .join(",")}`,
+              )
+              .run(...values);
+          },
+          delete: (collection, key) => {
+            const values =
+              collection === "posts" ? (JSON.parse(key) as string[]) : [key];
+            this.db
+              .prepare(
+                `DELETE FROM ${collection} WHERE ${tables[collection].keys.map((k) => `${k}=?`).join(" AND ")}`,
+              )
+              .run(...values);
+          },
+        });
+        this.db.exec("COMMIT");
+        return result;
+      } catch (error) {
+        this.db.exec("ROLLBACK");
+        throw error;
+      }
+    });
+    this.queue = operation.catch(() => {});
+    return operation;
+  }
+  async get<C extends LedgerCollection>(collection: C, key: string) {
+    await this.queue;
+    return this.read(collection, key);
+  }
+  async list<C extends LedgerCollection>(
+    collection: C,
+  ): Promise<LedgerRecords[C][]> {
+    await this.queue;
+    return this.db
+      .prepare(`SELECT * FROM ${collection}`)
+      .all()
+      .map((row) => {
+        if (collection === "room_leases")
+          row.members = JSON.parse(row.members as string);
+        return row as LedgerRecords[C];
+      });
+  }
+  override async pinPolicy(policy: PaymentPolicy) {
+    await this.transaction(async (tx) => {
       const wanted = canonical(policy);
-      const pinned = this.db
-        .prepare("SELECT value FROM settings WHERE name='payment-policy'")
-        .get() as { value: string } | undefined;
-      const legacyMismatch = this.db
+      const pinned = await tx.get("settings", "payment-policy");
+      const mismatch = this.db
         .prepare(
           "SELECT 1 FROM rooms WHERE COALESCE(json_extract(definition,'$.payment'),'')<>? LIMIT 1",
         )
         .get(wanted);
-      if ((pinned && pinned.value !== wanted) || (!pinned && legacyMismatch))
-        throw new Error(
-          "Payment identity differs from the ledger. Restore the original receipt key, treasury and service ID, or perform a reviewed migration.",
-        );
-      this.db
-        .prepare(
-          "INSERT OR IGNORE INTO settings(name,value) VALUES('payment-policy',?)",
-        )
-        .run(wanted);
+      if ((pinned && pinned.value !== wanted) || (!pinned && mismatch))
+        throw identityError();
+      if (!pinned)
+        tx.set("settings", "payment-policy", {
+          name: "payment-policy",
+          value: wanted,
+        });
     });
   }
-  rateLimit(wallet: string, group: string, limit: number, now = Date.now()) {
-    const window = Math.floor(now / 60000),
-      bucket = `${group}:${wallet.toLowerCase()}`;
-    return this.transaction(() => {
-      this.db
-        .prepare("DELETE FROM rate_windows WHERE window<?")
-        .run(window - 1);
-      const current = this.db
-        .prepare("SELECT window,count FROM rate_windows WHERE bucket=?")
-        .get(bucket) as { window: number; count: number } | undefined;
-      if (current?.window === window && current.count >= limit) return false;
-      this.db
-        .prepare(
-          "INSERT INTO rate_windows(bucket,window,count) VALUES(?,?,1) ON CONFLICT(bucket) DO UPDATE SET count=CASE WHEN rate_windows.window=excluded.window THEN rate_windows.count+1 ELSE 1 END,window=excluded.window",
-        )
-        .run(bucket, window);
-      return true;
-    });
-  }
-  acquireLease(
-    room: string,
-    actor: string,
-    lease: string,
-    capacity: number,
-    now = Date.now(),
-  ) {
-    return this.transaction(() => {
-      this.db.prepare("DELETE FROM leases WHERE expires<=?").run(now);
-      const existing = this.db
-        .prepare("SELECT lease FROM leases WHERE room=? AND actor=?")
-        .get(room, actor.toLowerCase());
-      const count = (
-        this.db
-          .prepare("SELECT COUNT(*) AS count FROM leases WHERE room=?")
-          .get(room) as { count: number }
-      ).count;
-      if (!existing && count >= capacity) return false;
-      this.db
-        .prepare(
-          "INSERT INTO leases(room,actor,lease,expires) VALUES(?,?,?,?) ON CONFLICT(room,actor) DO UPDATE SET lease=excluded.lease,expires=excluded.expires",
-        )
-        .run(room, actor.toLowerCase(), lease, now + 45000);
-      return true;
-    });
-  }
-  releaseLease(room: string, actor: string, lease: string) {
-    this.db
-      .prepare("DELETE FROM leases WHERE room=? AND actor=? AND lease=?")
-      .run(room, actor.toLowerCase(), lease);
-  }
-  hasLease(room: string, actor: string, now = Date.now()) {
-    return !!this.db
-      .prepare("SELECT 1 FROM leases WHERE room=? AND actor=? AND expires>?")
-      .get(room, actor.toLowerCase(), now);
-  }
-  leaseCount(room: string, now = Date.now()) {
-    return (
-      this.db
-        .prepare(
-          "SELECT COUNT(*) AS count FROM leases WHERE room=? AND expires>?",
-        )
-        .get(room, now) as { count: number }
-    ).count;
-  }
-  balance(wallet: string) {
-    return Number(
-      (
-        this.db
-          .prepare("SELECT amount FROM credits WHERE wallet=?")
-          .get(wallet.toLowerCase()) as { amount: number } | undefined
-      )?.amount || 0,
-    );
+  async close() {
+    await this.queue;
+    this.db.close();
   }
 }
 const globals = globalThis as typeof globalThis & {
-  mycelicPaymentStore?: PaymentStore;
+  mycelicPaymentStore?: Promise<PaymentLedger>;
 };
-export const paymentStore = () =>
-  (globals.mycelicPaymentStore ??= new PaymentStore());
+export function paymentStore(): Promise<PaymentLedger> {
+  if (!globals.mycelicPaymentStore) {
+    const backend =
+      process.env.MYCELIC_STORAGE_BACKEND ||
+      (process.env.VERCEL ? "firestore" : "sqlite");
+    globals.mycelicPaymentStore = (async () => {
+      if (backend === "firestore") {
+        const { createFirestoreStore } = await import("./firestoreStore");
+        return createFirestoreStore();
+      }
+      if (backend !== "sqlite")
+        throw new Error("MYCELIC_STORAGE_BACKEND must be firestore or sqlite");
+      if (process.env.VERCEL)
+        throw new Error(
+          "Vercel payments require MYCELIC_STORAGE_BACKEND=firestore. Local SQLite is not persistent on Vercel.",
+        );
+      return new PaymentStore();
+    })().catch((error) => {
+      globals.mycelicPaymentStore = undefined;
+      throw error;
+    });
+  }
+  return globals.mycelicPaymentStore;
+}

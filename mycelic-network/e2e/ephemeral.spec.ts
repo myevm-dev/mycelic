@@ -34,7 +34,7 @@ test("ephemeral chat clears history, preserves wallet credits, and disables arch
 test("Voice is coming soon and keeps the shared theme", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
-  await page.getByRole("link", { name: "Explore Voice", exact: true }).click();
+  await page.getByRole("link", { name: "Preview Voice", exact: true }).click();
   await expect(page).toHaveURL(/\/voice$/);
   await expect(page.getByText("Coming soon", { exact: true })).toBeVisible();
   await expect(

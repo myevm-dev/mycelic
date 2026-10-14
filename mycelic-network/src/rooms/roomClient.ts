@@ -185,6 +185,7 @@ export class LocalRoomClient implements RoomClient {
     }
     if (
       result.code === "payment_rejected" ||
+      result.code === "payment_self_transfer" ||
       result.code === "intent_expired"
     ) {
       this.attempts.delete(key);

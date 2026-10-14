@@ -78,14 +78,14 @@ export async function handleRoomOperation(
   const config = publicPaymentConfig();
   if (!config.enabled)
     throw new HttpError(503, config.reason || "Payments disabled");
-  const store = paymentStore();
+  const store = await paymentStore();
   try {
-    store.pinPolicy(config.policy);
+    await store.pinPolicy(config.policy);
   } catch {
     throw new HttpError(
       503,
-      "Payment identity differs from the ledger. Operator recovery is required before accepting payments.",
-      "payment_identity_mismatch",
+      "Payment ledger unavailable or its identity has changed. Operator recovery is required before accepting payments.",
+      "ledger_unavailable",
     );
   }
   const service = new PaymentService(
@@ -100,22 +100,20 @@ export async function handleRoomOperation(
     .passthrough()
     .parse(operation.payload.data);
   if (operation.action === "metadata") {
-    const row = store.db
-      .prepare("SELECT definition,receipt FROM rooms WHERE hash=?")
-      .get(hashSchema.parse(data.roomHash)) as
-      { definition: string; receipt: string } | undefined;
+    const row = await store.get("rooms", hashSchema.parse(data.roomHash));
     if (!row) throw new HttpError(404, "Room not found");
-    if (!store.rateLimit(operation.actor, "metadata", 120))
+    if (!(await store.rateLimit(operation.actor, "metadata", 120)))
       throw new HttpError(429, "Too many metadata requests; try again shortly");
     const room = JSON.parse(row.definition);
     if (!registry.rooms.has(room.hash)) registry.create(room, room.owner);
+    const activePeerCount = await store.leaseCount(room.hash);
     return {
       status: 200,
       body: {
         ...registry.metadata(room.hash),
-        status: store.leaseCount(room.hash) > 0 ? "active" : "empty",
+        status: activePeerCount > 0 ? "active" : "empty",
         creationReceipt: JSON.parse(row.receipt),
-        activePeerCount: store.leaseCount(room.hash),
+        activePeerCount,
         maxParticipants:
           room.policy.mode === "direct" ? 2 : config.maxParticipants,
       },
@@ -130,7 +128,7 @@ export async function handleRoomOperation(
     );
     if (certificate.session.toLowerCase() !== operation.actor.toLowerCase())
       throw new HttpError(401, "Session signer mismatch");
-    if (!store.rateLimit(certificate.identity, "payment-status", 30))
+    if (!(await store.rateLimit(certificate.identity, "payment-status", 30)))
       throw new HttpError(429, "Too many recovery checks; try again shortly");
     return {
       status: 200,
@@ -145,19 +143,14 @@ export async function handleRoomOperation(
   if (operation.action === "create") {
     room = await verifyRoom(data.room);
     assertPaymentPolicy(room, config.policy);
-    const existing = store.db
-      .prepare("SELECT definition,receipt FROM rooms WHERE hash=?")
-      .get(room.hash) as { definition: string; receipt: string } | undefined;
+    const existing = await store.get("rooms", room.hash);
     if (existing && existing.definition !== canonical(room))
       throw new HttpError(
         409,
         "Room already exists with a different definition",
       );
   } else {
-    const row = store.db
-      .prepare("SELECT definition FROM rooms WHERE hash=?")
-      .get(hashSchema.parse(data.roomHash)) as
-      { definition: string } | undefined;
+    const row = await store.get("rooms", hashSchema.parse(data.roomHash));
     if (!row) throw new HttpError(404, "Room not found");
     room = await verifyRoom(JSON.parse(row.definition));
     assertPaymentPolicy(room, config.policy);
@@ -171,7 +164,7 @@ export async function handleRoomOperation(
   const invitation = admission.invitation as Parameters<typeof assertAccess>[2];
   await assertAccess(room, certificate.identity, invitation);
   const wallet = certificate.identity;
-  if (!store.rateLimit(wallet, "room-operations", 240))
+  if (!(await store.rateLimit(wallet, "room-operations", 240)))
     throw new HttpError(
       429,
       "Wallet request limit reached; retry the same operation later",
@@ -179,9 +172,7 @@ export async function handleRoomOperation(
   if (operation.action === "create") {
     if (room.owner.toLowerCase() !== wallet.toLowerCase())
       throw new HttpError(403, "Only the owner can create this room");
-    const existing = store.db
-      .prepare("SELECT receipt FROM rooms WHERE hash=?")
-      .get(room.hash) as { receipt: string } | undefined;
+    const existing = await store.get("rooms", room.hash);
     if (existing)
       return {
         status: 200,
@@ -208,9 +199,9 @@ export async function handleRoomOperation(
       paymentHeader,
     });
   if (operation.action === "balance")
-    return { status: 200, body: { balance: store.balance(wallet) } };
+    return { status: 200, body: { balance: await store.balance(wallet) } };
   if (operation.action === "post") {
-    if (!store.hasLease(room.hash, operation.actor))
+    if (!(await store.hasLease(room.hash, operation.actor)))
       throw new HttpError(
         403,
         "Connect or renew room admission before posting",
@@ -230,18 +221,18 @@ export async function handleRoomOperation(
   const leaseId = z.string().uuid().parse(data.leaseId);
   if (operation.action === "heartbeat") {
     if (
-      !store.acquireLease(
+      !(await store.acquireLease(
         room.hash,
         operation.actor,
         leaseId,
         room.policy.mode === "direct" ? 2 : config.maxParticipants,
-      )
+      ))
     )
       throw new HttpError(
         409,
         "This room is full. Try again after someone leaves.",
         "room_full",
       );
-  } else store.releaseLease(room.hash, operation.actor, leaseId);
+  } else await store.releaseLease(room.hash, operation.actor, leaseId);
   return { status: 200, body: { ok: true } };
 }

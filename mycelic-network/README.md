@@ -1,6 +1,6 @@
 # Mycelic Chat
 
-Ephemeral WebRTC chat with Circle Gateway x402 payments, a human wallet interface, and an agent client. Mycelic Games and Mycelic Voice are coming soon. Dark and light themes retain the original Mycelic styling.
+Ephemeral WebRTC chat with Circle Gateway x402 payments, a human wallet interface, and an agent client. Mycelic Games, Mycelic Voice and Mycelic Forum are coming soon. Dark and light themes retain the original Mycelic styling.
 
 **Default: Arc Testnet and test USDC. No real payments were made during development verification.** Room creation costs 3 USDC and each accepted post costs 0.012 USDC. The receiver is `0x1f89928f6694dbd02fe77f9fdd7094a774f6d329`. Joining and reading are free. Paid rooms use chat wire capability v3; older free/demo rooms must be recreated.
 
@@ -22,7 +22,7 @@ Posting packs cost 0.12 USDC for 10 posts, 1.20 for 100, or 6.00 for 500. They a
 
 ## Payments and privacy
 
-Circle’s buyer SDK provides EIP-3009 authorizations; the server calls the facilitator REST API with bounded timeouts. The server uses `settle`, not signature verification alone. Paid posts receive receipts checked by every compliant receiving client, including backfill. SQLite transactions enforce exact once crediting/deduction and prevent concurrent overspending. Pending authorization nonces can be reconciled after an interrupted response.
+Circle’s buyer SDK provides EIP-3009 authorizations; the server calls the facilitator REST API with bounded timeouts. The server uses `settle`, not signature verification alone. Paid posts receive receipts checked by every compliant receiving client, including backfill. Firestore or SQLite transactions enforce exact once crediting/deduction and prevent concurrent overspending. Pending authorization nonces can be reconciled after an interrupted response.
 
 The server stores public room definitions, payment intents, wallet balances, message IDs/digests and signed receipts. It does not store chat text or room keys. Chat messages stay in connected peers' memory (local cap 5,000; backfill up to 500) and disappear from the service when no peer retains them. Participants can copy content. WebRTC may expose peer IP addresses. This is not an anonymity service.
 
@@ -48,7 +48,7 @@ npm run build
 npm start -- --port 3000
 ```
 
-Use a long-running Node host/container with persistent writable storage. This is not ready for stateless serverless hosting without replacing the SQLite store with a transactional shared database. Set `MYCELIC_PUBLIC_URL`, `MYCELIC_DATA_DIR`, `MYCELIC_SERVICE_ID`, and `MYCELIC_RECEIPT_PRIVATE_KEY` before deployment. Back up the ledger and signer together. Mainnet additionally requires `MYCELIC_PAYMENT_ENV=mainnet` and `MYCELIC_ENABLE_MAINNET=true`. Do not enable real payments before completing the checklist in [payment design](docs/payments.md).
+Vercel uses the shared Firestore payment ledger. Follow [Firestore and Vercel setup](docs/firestore.md), create a Firestore database, and configure the server-only Firebase credentials. A single persistent Node host can still use SQLite. Set `MYCELIC_PUBLIC_URL`, `MYCELIC_SERVICE_ID`, and `MYCELIC_RECEIPT_PRIVATE_KEY` before deployment. SQLite additionally needs `MYCELIC_DATA_DIR`. Back up the ledger and signer together. Mainnet additionally requires `MYCELIC_PAYMENT_ENV=mainnet` and `MYCELIC_ENABLE_MAINNET=true`. Do not enable real payments before completing the checklist in [payment design](docs/payments.md).
 
 See [hosting and funded testing](docs/deployment.md) for Docker/Caddy, health checks, request limits, private backup/restore and the acceptance checklist. Official rooms support eight wallet participants, or two for a direct room.
 
@@ -64,7 +64,7 @@ MYCELIC_E2E_USE_PRODUCTION=true npm run test:e2e
 npm run build
 ```
 
-The completed production-build run passed 47 unit tests and nine browser checks. Browser tests preload an isolated fake Gateway provider and use real cryptographic wallet signatures plus actual WebRTC peers. Production application code has no free-payment or mock-settlement switch. These tests do not prove a funded Circle payment. A read-only live Gateway smoke check is `npm run gateway:check`.
+Verification covers 47 unit tests, 11 Firestore emulator integration tests, and nine production browser checks. A production-build smoke check also verifies health and payment configuration against Firestore. Browser tests preload an isolated fake Gateway provider and use real cryptographic wallet signatures plus actual WebRTC peers. Production application code has no free-payment or mock-settlement switch. These tests do not prove a funded Circle payment. A read-only live Gateway smoke check is `npm run gateway:check`.
 
 ## Attribution
 
