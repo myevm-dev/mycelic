@@ -47,3 +47,11 @@ References: [Circle seller quickstart](https://developers.circle.com/gateway-nan
 ## Operational hardening
 
 Gateway calls have 15-second timeouts. Unknown or nonce-conflict settlement outcomes remain pending for reconciliation. Status checks never authorize a replacement payment. Both backends use transactions, pin the payment identity and preserve room admission leases across process restarts. Firestore uses shared documents for room capacity and nonce uniqueness so multiple server instances cannot overspend credits or settle one intent twice. Official clients acquire admission before WebRTC and posts require a live lease before credit deduction. Request and wallet limits reduce bounded abuse; distributed attacks still require host controls. See [deployment and restore instructions](deployment.md).
+
+## Payer and treasury must differ
+
+Circle Gateway rejects `self_transfer`: a payment cannot have the same sender and recipient. Use a different payer wallet when testing your own treasury. The UI and server block this before payment authorization. Joining and reading are still free for the treasury wallet.
+
+Known Gateway rejections such as `insufficient_balance`, `authorization_expired` and `self_transfer` are recorded as failed only when the response has no transfer identifier. Unknown outcomes and `nonce_already_used` remain pending for reconciliation. The original nonce is retained.
+
+For older pending self-transfer attempts, retry the same operation after updating. Recovery first queries Gateway for the original nonce; an accepted record takes precedence. If no record exists and the stored authorization pays its own sender, the app records the documented rejection, issues no room or credits, and clears only that rejected creation draft. No new settlement or payment signature is requested by this recovery. A fresh room requires a different payer/owner wallet. Preserve the treasury and pinned payment identity.

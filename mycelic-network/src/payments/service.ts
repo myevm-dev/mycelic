@@ -8,10 +8,14 @@ import {
   type PaymentPolicy,
 } from "@/types/protocol";
 import { roomDigest } from "@mycelic/room-protocol";
-import { CREDIT_PACKS } from "./shared";
+import { CREDIT_PACKS, SELF_TRANSFER_MESSAGE } from "./shared";
 import { type PaymentLedger, type IntentRow, postKey } from "./ledger";
 export type { IntentRow } from "./ledger";
-import { type GatewayProvider, validateGatewayPayload } from "./gateway";
+import {
+  type GatewayProvider,
+  type GatewayPayload,
+  validateGatewayPayload,
+} from "./gateway";
 export class HttpError extends Error {
   constructor(
     public status: number,
@@ -27,6 +31,26 @@ export type ApiResult = {
   body: unknown;
   headers?: Record<string, string>;
 };
+// Documented Gateway rejection reasons. Nonce conflicts and unknown outcomes remain pending.
+const definitiveRejections = new Set([
+  "unsupported_scheme",
+  "unsupported_network",
+  "unsupported_asset",
+  "invalid_payload",
+  "address_mismatch",
+  "amount_mismatch",
+  "invalid_signature",
+  "authorization_not_yet_valid",
+  "authorization_expired",
+  "authorization_validity_too_short",
+  "self_transfer",
+  "insufficient_balance",
+  "unsupported_domain",
+  "wallet_not_found",
+  // Retain compatibility with earlier facilitator error names.
+  "insufficient_funds",
+  "expired_authorization",
+]);
 export class PaymentService {
   constructor(
     readonly store: PaymentLedger,
@@ -97,6 +121,12 @@ export class PaymentService {
           );
       }
       if (!current) {
+        if (args.wallet.toLowerCase() === this.policy.treasury.toLowerCase())
+          throw new HttpError(
+            402,
+            SELF_TRANSFER_MESSAGE,
+            "payment_self_transfer",
+          );
         current = {
           id: args.id,
           owner: args.wallet.toLowerCase(),
@@ -131,8 +161,12 @@ export class PaymentService {
     if (row.status === "failed")
       throw new HttpError(
         402,
-        row.error || "Gateway rejected this authorization",
-        "payment_rejected",
+        row.error === "self_transfer"
+          ? SELF_TRANSFER_MESSAGE
+          : row.error || "Gateway rejected this authorization",
+        row.error === "self_transfer"
+          ? "payment_self_transfer"
+          : "payment_rejected",
       );
     const url = new URL(args.url);
     url.search = "";
@@ -142,7 +176,7 @@ export class PaymentService {
     if (row.nonce) {
       const stored = JSON.parse(row.payload!) as {
         selected: { network: string };
-        payload: unknown;
+        payload: GatewayPayload;
       };
       const accepted = await this.gateway.reconcile(row.nonce, {
         payer: row.owner,
@@ -193,12 +227,35 @@ export class PaymentService {
           { intentId: row.id },
         );
       }
+      // Recover attempts created before the self-transfer guard existed. An accepted
+      // record above always takes precedence; never erase an accepted payment.
+      const authorization = stored.payload.payload.authorization;
+      if (
+        !accepted &&
+        authorization.from.toLowerCase() === authorization.to.toLowerCase() &&
+        authorization.from.toLowerCase() === row.owner &&
+        authorization.to.toLowerCase() === this.policy.treasury.toLowerCase()
+      ) {
+        await this.failIntent(row.id, "self_transfer");
+        throw new HttpError(
+          402,
+          SELF_TRANSFER_MESSAGE,
+          "payment_self_transfer",
+          { intentId: row.id },
+        );
+      }
       throw new HttpError(
         409,
         "Payment is pending or needs reconciliation. Retry this same operation; do not authorize a new payment.",
         "payment_pending",
         { intentId: row.id },
       );
+    }
+    if (row.owner === this.policy.treasury.toLowerCase()) {
+      await this.failIntent(row.id, "self_transfer");
+      throw new HttpError(402, SELF_TRANSFER_MESSAGE, "payment_self_transfer", {
+        intentId: row.id,
+      });
     }
     if (row.expires < Date.now())
       throw new HttpError(
@@ -308,28 +365,29 @@ export class PaymentService {
     }
     if (!settlement.success) {
       // Nonce conflicts and unknown outcomes can mean a previous request was accepted.
-      if (
-        ![
-          "insufficient_funds",
-          "invalid_signature",
-          "invalid_payload",
-          "expired_authorization",
-        ].includes(settlement.errorReason || "")
-      )
+      const reason = settlement.errorReason || "unknown_error";
+      if (settlement.transaction || !definitiveRejections.has(reason)) {
+        await this.recordPendingError(row.id, reason);
         throw new HttpError(
           409,
           "Gateway outcome needs reconciliation. Check this payment before authorizing another.",
           "payment_pending",
-          { intentId: row.id },
+          { intentId: row.id, gatewayReason: reason },
         );
+      }
       await this.failIntent(
         row.id,
         settlement.errorReason || "Gateway rejected authorization",
       );
       throw new HttpError(
         402,
-        `Gateway rejected payment: ${settlement.errorReason || "unknown reason"}. No credit issued. Keep the intent ID for support.`,
-        "payment_rejected",
+        reason === "self_transfer"
+          ? SELF_TRANSFER_MESSAGE
+          : `Gateway rejected payment: ${reason}. No credit issued. Keep the intent ID for support.`,
+        reason === "self_transfer"
+          ? "payment_self_transfer"
+          : "payment_rejected",
+        { intentId: row.id, gatewayReason: reason },
       );
     }
     if (
@@ -407,6 +465,15 @@ export class PaymentService {
         result: JSON.stringify(result),
       });
       return result;
+    });
+  }
+  private async recordPendingError(id: string, reason: string) {
+    // Persist only a bounded code, never a signed authorization or arbitrary response body.
+    const error = `Gateway: ${reason.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 100)}`;
+    await this.store.transaction(async (tx) => {
+      const current = await tx.get("intents", id);
+      if (current?.status === "pending" && !current.result)
+        tx.set("intents", id, { ...current, error });
     });
   }
   private async failIntent(id: string, error: string) {

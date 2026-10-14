@@ -23,10 +23,11 @@ import {
   type Invitation,
   type SessionCertificate,
 } from "@/types/protocol";
-import { LocalRoomClient } from "@/rooms/roomClient";
+import { LocalRoomClient, RoomApiError } from "@/rooms/roomClient";
 import { PaymentPanel } from "./PaymentPanel";
 import { signGatewayChallenge, type PaymentSigner } from "@/payments/client";
 import {
+  SELF_TRANSFER_MESSAGE,
   publicPaymentConfigSchema,
   type PublicPaymentConfig,
 } from "@/payments/shared";
@@ -218,6 +219,12 @@ export function ChatApp() {
         );
         return;
       }
+      if (
+        address &&
+        paymentConfig &&
+        address.toLowerCase() === paymentConfig.policy.treasury.toLowerCase()
+      )
+        throw new Error(SELF_TRANSFER_MESSAGE);
       const wallets = allowlist.split(/[\s,;]+/).filter(Boolean);
       if (
         mode === "direct" &&
@@ -287,6 +294,16 @@ export function ChatApp() {
         `/chat#${new URLSearchParams({ room: room.hash, key: secret, ...(invitation ? { invite: JSON.stringify(invitation) } : {}) })}`,
       );
     } catch (error) {
+      if (
+        error instanceof RoomApiError &&
+        error.code === "payment_self_transfer"
+      ) {
+        // The server has definitively rejected this attempt. A different owner
+        // needs a new signed room definition; do not retain the treasury's draft.
+        creationDraft.current = null;
+        setHasDraft(false);
+        sessionStorage.removeItem("mycelic.creation-draft");
+      }
       setError(error instanceof Error ? error.message : "Room creation failed");
     } finally {
       setBusy(false);
@@ -428,7 +445,6 @@ export function ChatApp() {
                 <Icon name="chat" />
               </span>
               <span className="eyebrow">MYCELIC CHAT</span>
-           
             </div>
             <h1>
               Mycelic Chat<span className="accent-text">.</span>
