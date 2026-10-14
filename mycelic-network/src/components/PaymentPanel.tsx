@@ -106,7 +106,7 @@ export function PaymentPanel({
       <div className="section-topline">
         <h2>Gateway wallet</h2>
         <span className="pill">
-          {config.policy.environment === "mainnet"
+          {config.policy.environment === "testnet"
             ? "Test USDC only"
             : "USDC payments"}
         </span>
