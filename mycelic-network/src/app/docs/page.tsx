@@ -65,7 +65,7 @@ export default function ChatHelp() {
         </p>
         <p>
           Mycelic Games, Mycelic Voice and Mycelic Forum are coming soon.
-          Mainnet payments remain disabled by default.
+          The demo is live on Arc. Other networks are currently disabled.
         </p>
         <NavigationLink className="text-link" href="/chat">
           Open Mycelic Chat →
