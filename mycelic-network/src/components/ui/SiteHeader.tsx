@@ -28,13 +28,15 @@ export function SiteHeader() {
       <nav aria-label="Main navigation">
         {[
           { href: "/chat", label: "Chat" },
-          { href: "/games", label: "Games" },
-          { href: "/voice", label: "Voice" },
+          { href: "/docs", label: "Get started" },
+          { href: "/docs#agents", label: "Agents" },
         ].map(({ href, label }) => (
           <NavigationLink
             key={label}
             href={href}
-            aria-current={pathname === href ? "page" : undefined}
+            aria-current={
+              pathname === href && !href.includes("#") ? "page" : undefined
+            }
           >
             {label}
           </NavigationLink>

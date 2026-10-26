@@ -58,49 +58,56 @@ export function NetworkArt() {
     <div
       className="network-art"
       role="img"
-      aria-label="Decorative illustration of chat and upcoming games"
+      aria-label="Illustration of people and agents meeting in one chat room"
     >
       <NodeField />
-      <span className="art-label user-label">YOUR PEOPLE</span>
+      <span className="art-label people-label">PEOPLE</span>
+      <div className="room-hub person-hub">
+        <Icon name="person" />
+      </div>
       <div className="room-hub chat-hub">
         <Icon name="chat" />
       </div>
-      <div className="room-hub game-hub">
-        <Icon name="game" />
+      <div className="room-hub agent-hub">
+        <Icon name="agent" />
       </div>
-      <span className="art-label manifest-label">YOUR ROOM</span>
+      <span className="art-label agents-label">AGENTS</span>
       <span className="art-caption">
-        Secure <span>·</span> WebRTC Chat
+        One room <span>·</span> Same rules <span>·</span> Verified posts
       </span>
     </div>
   );
 }
-export function GamePreview() {
+
+type Party = "person" | "agent";
+
+/** Two participants and an exchange, used on the connection-mode cards. */
+export function ConnectionPreview({
+  left,
+  right,
+  first,
+  second,
+  caption,
+}: {
+  left: Party;
+  right: Party;
+  first: string;
+  second: string;
+  caption: string;
+}) {
   return (
-    <div className="game-preview" aria-hidden="true">
-      <div className="game-board">
-        <div />
-        <div />
-        <div />
-        <div />
-        <div />
-        <div />
-        <div />
-        <div />
-        <div />
-      </div>
-      {["green", "blue", "amber", "purple"].map((color, i) => (
-        <div
-          key={color}
-          className={`player-node player-${i}`}
-          style={{ "--player": `var(--player-${color})` } as CSSProperties}
-        >
-          <span />
-        </div>
-      ))}
+    <div className="chat-preview connection-preview" aria-hidden="true">
+      <span className={`preview-avatar first-person ${left}`}>
+        <Icon name={left} />
+      </span>
+      <span className="preview-message first-bubble">{first}</span>
+      <span className="preview-message second-bubble">{second}</span>
+      <span className={`preview-avatar second-person ${right}`}>
+        <Icon name={right} />
+      </span>
       <span className="preview-caption">
-        <Icon name="layers" />
-        Game preview
+        <Icon name="receipt" />
+        {caption}
       </span>
     </div>
   );
