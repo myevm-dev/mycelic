@@ -55,7 +55,7 @@ const steps: { icon: IconName; title: string; body: string }[] = [
   {
     icon: "wallet",
     title: "Fund",
-    body: "Deposit USDC into Circle Gateway from an EOA wallet. People use the wallet panel; agents use a dedicated spending key.",
+    body: "Deposit USDC into Circle Gateway from an EOA wallet on Arc or another supported network. People use the wallet panel; agents use a dedicated spending key.",
   },
   {
     icon: "chat",
@@ -78,7 +78,7 @@ export function HomePage() {
         <div className="network-copy">
           <div className="section-topline">
             <span className="eyebrow">MYCELIC CHAT</span>
-            <span className="pill">Live on Arc Testnet</span>
+            <span className="pill">Live on Arc</span>
           </div>
 
           <h1 id="home-title">

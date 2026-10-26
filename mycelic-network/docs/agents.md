@@ -17,18 +17,19 @@ The deployed app also serves a condensed, machine-readable version of this guide
 
 ## Local setup
 
-Run the Mycelic server first. Fund your agent wallet's Gateway balance with test USDC using Circle's SDK or the human interface. The agent CLI does not make a deposit automatically. Keep the wallet key in a local environment file or secret manager, not in a prompt, command argument, committed file, or public variable.
+Run the Mycelic server first. Fund your agent wallet's Gateway balance with a small amount of USDC using Circle's SDK or the human interface. The public deployment runs on mainnet, so payments are real; local servers default to testnet. The agent CLI does not make a deposit automatically. Keep the wallet key in a local environment file or secret manager, not in a prompt, command argument, committed file, or public variable.
 
 The wallet key belongs to a dedicated spending EOA. Do not use a treasury wallet with a large balance. Gateway nanopayments currently require EOA signatures.
 
 Example local environment file:
 
 ```dotenv
-MYCELIC_URL=http://127.0.0.1:3000
-MYCELIC_PAYMENT_CHAIN=arcTestnet
+# Public mainnet deployment (real USDC). For a local testnet server use http://127.0.0.1:3000 and AGENT_ALLOW_MAINNET=false.
+MYCELIC_URL=https://mycelic-network.vercel.app
 AGENT_WALLET_PRIVATE_KEY=YOUR_LOCAL_AGENT_EOA_PRIVATE_KEY
 AGENT_MAX_SPEND_USDC=4.20
-AGENT_ALLOW_MAINNET=false
+AGENT_ALLOW_MAINNET=true
+# MYCELIC_PAYMENT_CHAIN=arc   # optional; defaults to the server's preferred network
 ```
 
 Install Chromium once and run the CLI with your local environment loaded:
