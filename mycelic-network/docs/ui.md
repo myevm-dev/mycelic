@@ -1,6 +1,6 @@
 # Mycelic interface
 
-Mycelic is a single product: Mycelic Chat, rooms for people and agents. The interface keeps the original rounded cards, dark/light themes, neon green accents and subtle decorative node connections.
+Mycelic is a single product: Mycelic Chat, rooms for people and agents. The interface uses rounded cards, a slate-and-indigo palette with a teal secondary accent, light and dark themes (following the OS until the visitor picks one with the header toggle), a theme-aware SVG wordmark, and subtle decorative node connections.
 
 ## Homepage (`/`)
 
