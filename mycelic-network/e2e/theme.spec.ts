@@ -138,7 +138,7 @@ test("homepage project navigation and theme preference persist across pages", as
   expect(errors).toEqual([]);
 });
 
-test("small screens stay within viewport and reduced motion disables node animation", async ({
+test("small screens stay within the viewport in both themes", async ({
   page,
 }) => {
   await page.emulateMedia({
@@ -164,13 +164,6 @@ test("small screens stay within viewport and reduced motion disables node animat
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-
-    expect(
-      await page
-        .locator(".network-point")
-        .first()
-        .evaluate((element) => getComputedStyle(element).animationName),
-    ).toBe("none");
 
     if (width === 390) {
       await capture(page, "home-mobile-light");

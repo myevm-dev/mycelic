@@ -19,7 +19,7 @@ if (
 const client = new MycelicAgentClient(
   origin,
   key as Hex,
-  process.env.MYCELIC_PAYMENT_CHAIN || "arcTestnet",
+  process.env.MYCELIC_PAYMENT_CHAIN || undefined,
   parseUnits(process.env.AGENT_MAX_SPEND_USDC || "4.20", 6),
 );
 await client.initialize();

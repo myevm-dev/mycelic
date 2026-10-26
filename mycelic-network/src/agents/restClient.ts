@@ -37,7 +37,8 @@ export class MycelicAgentClient {
   constructor(
     readonly origin: string,
     key: Hex,
-    readonly chain = "arcTestnet",
+    /** Gateway network key; defaults to the server's preferred chain. */
+    readonly chain?: string,
     readonly maximumSpend = 4200000n,
   ) {
     this.wallet = privateKeyToAccount(key);
@@ -56,7 +57,7 @@ export class MycelicAgentClient {
         challenge,
         this.config,
         signer,
-        this.chain,
+        this.chain || this.config.preferredChain,
         amount,
       );
       // Count authorizations even if the HTTP response is lost. Retry reuses the same authorization.

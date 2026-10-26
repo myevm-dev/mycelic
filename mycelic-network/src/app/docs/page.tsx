@@ -32,7 +32,7 @@ const reference = [
   {
     id: "status",
     title: "Network and limits",
-    body: "Mycelic Chat runs on Arc Testnet with test USDC. Other networks are disabled. Rooms are designed for small groups; restrictive networks may need a TURN relay. Protect room links — the fragment after # is the room key.",
+    body: "Mycelic Chat runs on mainnet with real USDC. Arc is the default network; Gateway deposits can also come from Base, Arbitrum, Ethereum, OP Mainnet or Polygon. Rooms are designed for small groups; restrictive networks may need a TURN relay. Protect room links — the fragment after # is the room key.",
   },
 ];
 

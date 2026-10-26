@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Providers } from "./providers";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { SiteFooter } from "@/components/ui/SiteFooter";
-import { NodeField } from "@/components/ui/NetworkArt";
 import { SkipLink } from "@/components/ui/SkipLink";
 import "./globals.css";
 export const metadata: Metadata = {
@@ -28,9 +27,6 @@ export default function RootLayout({
         />
         <Providers>
           <SkipLink />
-          <div className="network-backdrop">
-            <NodeField backdrop />
-          </div>
           <SiteHeader />
           {children}
           <SiteFooter />
