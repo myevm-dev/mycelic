@@ -219,9 +219,10 @@ test("legacy root room links retain their fragment and join the chat route", asy
 
     await installTestWallet(guest);
     await guest.goto(link.toString());
-    await connectTestWallet(guest);
-
+    // Wait for the legacy redirect before connecting, or the wallet
+    // connection is lost when the page navigates.
     await expect(guest).toHaveURL(`${link.origin}/chat${fragment}`);
+    await connectTestWallet(guest);
 
     await guest
       .getByRole("button", {

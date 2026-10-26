@@ -23,7 +23,7 @@ export interface RoomClient {
   heartbeat(roomHash: string, leaseId: string): Promise<void>;
   release(roomHash: string, leaseId: string): Promise<void>;
   getPostingBalance(roomHash: string): Promise<number>;
-  checkPendingPayments(): Promise<PaymentStatus[]>;
+  checkPendingPayments(roomHash?: string): Promise<PaymentStatus[]>;
   buyPostingCredits(
     roomHash: string,
     pack: keyof typeof CREDIT_PACKS,
@@ -57,6 +57,11 @@ type Attempt = { id: string; header?: string; url?: string };
 export class LocalRoomClient implements RoomClient {
   private admission:
     { certificate: SessionCertificate; invitation?: Invitation } | undefined;
+  /** Admission per open room, so several rooms can stay connected at once. */
+  private admissions = new Map<
+    string,
+    { certificate: SessionCertificate; invitation?: Invitation }
+  >();
   private pay:
     | ((challenge: PaymentRequired, amount: string) => Promise<string>)
     | undefined;
@@ -95,6 +100,24 @@ export class LocalRoomClient implements RoomClient {
   }
   setAdmission(certificate: SessionCertificate, invitation?: Invitation) {
     this.admission = { certificate, invitation };
+    this.admissions.set(certificate.roomHash.toLowerCase(), this.admission);
+  }
+  /** Forget a room's admission after leaving it. */
+  clearAdmission(roomHash: string) {
+    this.admissions.delete(roomHash.toLowerCase());
+  }
+  private admissionFor(data: unknown) {
+    const record = (data ?? {}) as {
+      roomHash?: unknown;
+      room?: { hash?: unknown };
+    };
+    const hash =
+      typeof record.roomHash === "string"
+        ? record.roomHash
+        : typeof record.room?.hash === "string"
+          ? record.room.hash
+          : undefined;
+    return (hash && this.admissions.get(hash.toLowerCase())) || this.admission;
   }
   setPaymentSigner(
     callback: (challenge: PaymentRequired, amount: string) => Promise<string>,
@@ -106,10 +129,11 @@ export class LocalRoomClient implements RoomClient {
     data: unknown,
     amount?: string,
   ): Promise<T> {
+    const admission = this.admissionFor(data);
     const key = canonical({
       action,
       data,
-      wallet: this.admission?.certificate.identity,
+      wallet: admission?.certificate.identity,
     });
     const attempt = this.attempts.get(key) ?? { id: crypto.randomUUID() };
     if (amount) {
@@ -118,7 +142,7 @@ export class LocalRoomClient implements RoomClient {
     }
     const envelope = () => ({
       action,
-      payload: { data, admission: this.admission },
+      payload: { data, admission },
       actor: this.account.address as Address,
       nonce: attempt.id,
       at: Date.now(),
@@ -202,15 +226,18 @@ export class LocalRoomClient implements RoomClient {
     this.persistAttempts();
     return result as T;
   }
-  async checkPendingPayments(): Promise<PaymentStatus[]> {
-    if (!this.admission) throw new Error("Authorize your wallet session first");
-    const wallet = this.admission.certificate.identity;
+  async checkPendingPayments(roomHash?: string): Promise<PaymentStatus[]> {
+    const admission =
+      (roomHash && this.admissions.get(roomHash.toLowerCase())) ||
+      this.admission;
+    if (!admission) throw new Error("Authorize your wallet session first");
+    const wallet = admission.certificate.identity;
     const results: PaymentStatus[] = [];
     for (const [key, attempt] of [...this.attempts]) {
       const context = JSON.parse(key);
       if (context.wallet?.toLowerCase() !== wallet.toLowerCase()) continue;
       const status = await this.call<PaymentStatus>("paymentStatus", {
-        roomHash: this.admission.certificate.roomHash,
+        roomHash: admission.certificate.roomHash,
         intentId: attempt.id,
       });
       results.push(status);

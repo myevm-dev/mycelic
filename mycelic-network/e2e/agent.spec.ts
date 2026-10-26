@@ -113,7 +113,7 @@ test("a capped REST x402 agent joins a human room and exchanges paid WebRTC mess
       (await command({ id: "leave", method: "leave" })).error,
     ).toBeUndefined();
     await expect(
-      page.getByText("1 connected participants", { exact: true }),
+      page.getByText("1 connected participant", { exact: true }),
     ).toBeVisible();
   } finally {
     process.stdin.end();

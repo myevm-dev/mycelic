@@ -27,6 +27,10 @@ export type RoomMeshViewProps = {
   client: RoomClient;
   paymentConfig: PublicPaymentConfig;
   onExit: () => void;
+  /** Reports how many messages this room holds, for unread badges. */
+  onActivity?: (roomHash: string, count: number) => void;
+  /** Whether this room is the one on screen. Hidden rooms stay connected. */
+  active?: boolean;
 };
 export function RoomMeshView({
   room,
@@ -37,7 +41,11 @@ export function RoomMeshView({
   client,
   paymentConfig,
   onExit,
+  onActivity,
+  active = true,
 }: RoomMeshViewProps) {
+  const fieldId = `message-${room.hash.slice(2, 12)}`;
+  const feed = useRef<HTMLDivElement>(null);
   const { address } = useAccount();
   const [records, setRecords] = useState<ChatRecord[]>([]);
   const log = useRef<ChatRecord[]>([]);
@@ -184,6 +192,19 @@ export function RoomMeshView({
     if (leaving && !dialog.current?.open) dialog.current?.showModal();
     if (!leaving && dialog.current?.open) dialog.current.close();
   }, [leaving]);
+  useEffect(() => {
+    onActivity?.(room.hash, records.length);
+    const el = feed.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+    const last = records[records.length - 1];
+    if (nearBottom || last?.message.session === sessionAccount.address)
+      el.scrollTop = el.scrollHeight;
+  }, [records, onActivity, room.hash, sessionAccount.address]);
+  useEffect(() => {
+    if (active && feed.current)
+      feed.current.scrollTop = feed.current.scrollHeight;
+  }, [active]);
   const send = async () => {
     if (
       sendLock.current ||
@@ -276,7 +297,7 @@ export function RoomMeshView({
     setBuying(true);
     setError("");
     try {
-      const statuses = await client.checkPendingPayments();
+      const statuses = await client.checkPendingPayments(room.hash);
       setBalance(await client.getPostingBalance(room.hash));
       setNotice(
         statuses.length
@@ -321,7 +342,9 @@ export function RoomMeshView({
             <span className="pill">
               {room.policy.mode === "direct" ? "1-to-1" : "Group"}
             </span>
-            <span className="pill">{peers} connected participants</span>
+            <span className="pill">
+              {peers} connected participant{peers === 1 ? "" : "s"}
+            </span>
             <span className="pill">
               Up to{" "}
               {room.policy.mode === "direct"
@@ -331,7 +354,7 @@ export function RoomMeshView({
             </span>
             <span className="pill">Ephemeral · no archives</span>
             <span className="pill">
-              {paymentConfig.policy.environment === "mainnet"
+              {paymentConfig.policy.environment === "testnet"
                 ? "Test USDC"
                 : "USDC"}
             </span>
@@ -364,6 +387,7 @@ export function RoomMeshView({
       <div className="room-grid">
         <div className="conversation">
           <div
+            ref={feed}
             className="messages"
             aria-label="Chat messages"
             aria-live="polite"
@@ -409,11 +433,13 @@ export function RoomMeshView({
               void send();
             }}
           >
-            <label className="sr-only" htmlFor="message">
+            <label className="sr-only" htmlFor={fieldId}>
               Message
             </label>
             <textarea
-              id="message"
+              id={fieldId}
+              rows={2}
+              enterKeyHint="send"
               maxLength={4000}
               placeholder="Write to the room…"
               value={text}
@@ -427,7 +453,9 @@ export function RoomMeshView({
               }}
             />
             <div className="composer-bottom">
-              <small>0.012 USDC per post · Enter to send</small>
+              <small>
+                {Math.floor(balance / 12000)} posts left · 0.012 USDC each
+              </small>
               <button
                 className="primary"
                 disabled={

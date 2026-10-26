@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import {
   useAccount,
   useSignMessage,
@@ -47,6 +47,16 @@ type JoinedRoom = {
   certificate: SessionCertificate;
   invitation?: Invitation;
 };
+/** Event-handler clock; keeps the React compiler from treating handlers as render code. */
+const now = () => Date.now();
+/** Rooms kept connected at once. Each holds a WebRTC mesh and a lease. */
+const MAX_OPEN_ROOMS = 4;
+const roomUrl = (room: JoinedRoom) =>
+  `/chat#${new URLSearchParams({
+    room: room.room.hash,
+    key: room.secret,
+    ...(room.invitation ? { invite: JSON.stringify(room.invitation) } : {}),
+  })}`;
 export function ChatApp() {
   const [session] = useState(() => privateKeyToAccount(generatePrivateKey()));
   const [client] = useState(() => new LocalRoomClient(session));
@@ -55,7 +65,12 @@ export function ChatApp() {
   const [chainKey, setChainKey] = useState("arc");
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
-  const [joined, setJoined] = useState<JoinedRoom | null>(null);
+  const [rooms, setRooms] = useState<JoinedRoom[]>([]);
+  const [activeHash, setActiveHash] = useState<string | null>(null);
+  const activeRef = useRef<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [seen, setSeen] = useState<Record<string, number>>({});
+  const joined = rooms.find((r) => r.room.hash === activeHash) ?? null;
   const [title, setTitle] = useState("The gathering");
   const [mode, setMode] = useState<"group" | "direct">("group");
   const [allowlist, setAllowlist] = useState("");
@@ -158,6 +173,53 @@ export function ChatApp() {
         signMessageAsync({ message }),
     };
   };
+  const showRoom = (hash: string | null, list: JoinedRoom[] = rooms) => {
+    activeRef.current = hash;
+    setActiveHash(hash);
+    setError("");
+    setInviteLink("");
+    const target = list.find((r) => r.room.hash === hash);
+    if (target) setSeen((prev) => ({ ...prev, [hash!]: counts[hash!] ?? 0 }));
+    window.history.replaceState(null, "", target ? roomUrl(target) : "/chat");
+  };
+  const openRoom = (next: JoinedRoom) => {
+    const exists = rooms.some((r) => r.room.hash === next.room.hash);
+    if (!exists && rooms.length >= MAX_OPEN_ROOMS)
+      throw new Error(
+        `You can keep ${MAX_OPEN_ROOMS} rooms open at once. Leave one to open another.`,
+      );
+    const list = exists
+      ? rooms.map((r) => (r.room.hash === next.room.hash ? next : r))
+      : [...rooms, next];
+    setRooms(list);
+    showRoom(next.room.hash, list);
+  };
+  const closeRoom = (hash: string) => {
+    client.clearAdmission(hash);
+    const list = rooms.filter((r) => r.room.hash !== hash);
+    setRooms(list);
+    setCounts((prev) => {
+      const next = { ...prev };
+      delete next[hash];
+      return next;
+    });
+    setSeen((prev) => {
+      const next = { ...prev };
+      delete next[hash];
+      return next;
+    });
+    const next = activeHash === hash ? (list[list.length - 1] ?? null) : joined;
+    showRoom(next?.room.hash ?? null, list);
+  };
+  const onActivity = useCallback((hash: string, count: number) => {
+    setCounts((prev) =>
+      prev[hash] === count ? prev : { ...prev, [hash]: count },
+    );
+    if (activeRef.current === hash)
+      setSeen((prev) =>
+        prev[hash] === count ? prev : { ...prev, [hash]: count },
+      );
+  }, []);
   const prepareAdmission = async (
     room: RoomDefinition,
     secret: string,
@@ -173,7 +235,7 @@ export function ChatApp() {
       roomHash: room.hash,
       identity,
       session: session.address,
-      expiresAt: Date.now() + 60 * 60 * 1000,
+      expiresAt: now() + 60 * 60 * 1000,
     };
     const signature =
       identity === session.address
@@ -189,12 +251,7 @@ export function ChatApp() {
     invitation?: Invitation,
   ) => {
     const joinedRoom = await prepareAdmission(room, secret, invitation);
-    setJoined(joinedRoom);
-    window.history.replaceState(
-      null,
-      "",
-      `/chat#${new URLSearchParams({ room: room.hash, key: secret, ...(invitation ? { invite: JSON.stringify(invitation) } : {}) })}`,
-    );
+    openRoom(joinedRoom);
   };
   const create = async () => {
     setBusy(true);
@@ -206,19 +263,22 @@ export function ChatApp() {
           throw new Error(
             "Reconnect the room creator wallet to retry this creation",
           );
+        if (rooms.length >= MAX_OPEN_ROOMS)
+          throw new Error(
+            `You can keep ${MAX_OPEN_ROOMS} rooms open at once. Leave one to create another.`,
+          );
         const admitted = await prepareAdmission(room, secret, invitation);
         await client.createRoom(room);
-        setJoined(admitted);
         creationDraft.current = null;
         setHasDraft(false);
         sessionStorage.removeItem("mycelic.creation-draft");
-        window.history.replaceState(
-          null,
-          "",
-          `/chat#${new URLSearchParams({ room: room.hash, key: secret, ...(invitation ? { invite: JSON.stringify(invitation) } : {}) })}`,
-        );
+        openRoom(admitted);
         return;
       }
+      if (rooms.length >= MAX_OPEN_ROOMS)
+        throw new Error(
+          `You can keep ${MAX_OPEN_ROOMS} rooms open at once. Leave one to create another.`,
+        );
       if (
         address &&
         paymentConfig &&
@@ -259,7 +319,7 @@ export function ChatApp() {
           hash: keccak256(`0x${generateRoomSecret()}`),
           title,
           owner: address!,
-          createdAt: Date.now(),
+          createdAt: now(),
           policy,
           protocol: chatProtocol(true),
           payment: paymentConfig.policy,
@@ -270,7 +330,7 @@ export function ChatApp() {
         ? await issueInvitation(
             room,
             address!,
-            Date.now() + 24 * 60 * 60 * 1000,
+            now() + 24 * 60 * 60 * 1000,
             walletSigner(),
           )
         : undefined;
@@ -284,15 +344,10 @@ export function ChatApp() {
         JSON.stringify(creationDraft.current),
       );
       await client.createRoom(room);
-      setJoined(admitted);
       creationDraft.current = null;
       setHasDraft(false);
       sessionStorage.removeItem("mycelic.creation-draft");
-      window.history.replaceState(
-        null,
-        "",
-        `/chat#${new URLSearchParams({ room: room.hash, key: secret, ...(invitation ? { invite: JSON.stringify(invitation) } : {}) })}`,
-      );
+      openRoom(admitted);
     } catch (error) {
       if (
         error instanceof RoomApiError &&
@@ -319,6 +374,12 @@ export function ChatApp() {
       const secret = params.get("key");
       if (!hash || !secret || !/^[0-9a-f]{64}$/.test(secret))
         throw new Error("Paste a complete room invite link with a room key");
+      const already = rooms.find((r) => r.room.hash === hash);
+      if (already) {
+        showRoom(already.room.hash);
+        setJoinLink("");
+        return;
+      }
       const metadata = await client.getRoomMetadata(hash);
       const room = await verifyRoom(metadata.room);
       if (!paymentConfig) throw new Error("Payment configuration is not ready");
@@ -337,6 +398,7 @@ export function ChatApp() {
         ? invitationSchema.parse(JSON.parse(rawInvite))
         : undefined;
       await authorize(room, secret, invitation);
+      setJoinLink("");
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to join room");
     } finally {
@@ -350,7 +412,7 @@ export function ChatApp() {
       const invitation = await issueInvitation(
         joined.room,
         invitedWallet as Address,
-        Date.now() + 24 * 60 * 60 * 1000,
+        now() + 24 * 60 * 60 * 1000,
         walletSigner(),
       );
       invitationSchema.parse(invitation);
@@ -371,22 +433,65 @@ export function ChatApp() {
           {error}
         </p>
       )}
-      {joined ? (
-        <>
+      {rooms.length > 0 && (
+        <nav className="rooms-bar" aria-label="Open rooms">
+          <button
+            className="room-tab new-room"
+            aria-current={activeHash === null ? "page" : undefined}
+            onClick={() => showRoom(null)}
+          >
+            <Icon name="plus" />
+            <span>New or join</span>
+          </button>
+          {rooms.map((r) => {
+            const unread =
+              r.room.hash === activeHash
+                ? 0
+                : Math.max(
+                    0,
+                    (counts[r.room.hash] ?? 0) - (seen[r.room.hash] ?? 0),
+                  );
+            return (
+              <button
+                key={r.room.hash}
+                className="room-tab"
+                aria-current={r.room.hash === activeHash ? "page" : undefined}
+                onClick={() => showRoom(r.room.hash)}
+              >
+                <i className="room-tab-dot" aria-hidden="true" />
+                <span className="room-tab-title">{r.room.title}</span>
+                {unread > 0 && (
+                  <span className="unread" aria-label={`${unread} unread`}>
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+      {rooms.map((r) => (
+        <div
+          key={r.room.hash}
+          className="room-slot"
+          hidden={r.room.hash !== activeHash}
+        >
           <RoomMeshView
-            room={joined.room}
-            roomSecret={joined.secret}
-            certificate={joined.certificate}
-            invitation={joined.invitation}
+            room={r.room}
+            roomSecret={r.secret}
+            certificate={r.certificate}
+            invitation={r.invitation}
             sessionAccount={session}
             client={client}
             paymentConfig={paymentConfig!}
-            onExit={() => {
-              setJoined(null);
-              setInviteLink("");
-              window.history.replaceState(null, "", "/chat");
-            }}
+            active={r.room.hash === activeHash}
+            onActivity={onActivity}
+            onExit={() => closeRoom(r.room.hash)}
           />
+        </div>
+      ))}
+      {joined ? (
+        <div className="room-extras">
           <button
             className="quiet"
             disabled={busy}
@@ -436,9 +541,9 @@ export function ChatApp() {
               )}
             </details>
           )}
-        </>
+        </div>
       ) : (
-        <>
+        <div className="chat-lobby">
           <header className="app-hero">
             <div className="section-topline">
               <span className="icon-tile">
@@ -575,8 +680,9 @@ export function ChatApp() {
                     : "Create room · 3 USDC"}
               </button>
               <p className="fine">
-                Connect your wallet, fund Gateway, then confirm the creation
-                payment. No message history is stored on the server.
+                Connect your wallet, <a href="#gateway">fund Gateway</a>, then
+                confirm the creation payment. No message history is stored on
+                the server.
               </p>
             </section>
             <section className="card">
@@ -622,8 +728,7 @@ export function ChatApp() {
               </div>
             </section>
           </div>
-
-        </>
+        </div>
       )}
     </main>
   );
