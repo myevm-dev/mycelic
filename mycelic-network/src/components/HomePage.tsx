@@ -1,6 +1,6 @@
 import { NavigationLink } from "./ui/NavigationLink";
 import { Icon, type IconName } from "./ui/Icon";
-import { NetworkArt, ConnectionPreview } from "./ui/NetworkArt";
+import { RoomPreview, ConnectionPreview } from "./ui/Previews";
 import { LegacyRoomLink } from "./LegacyRoomLink";
 
 const modes = [
@@ -123,7 +123,7 @@ export function HomePage() {
           </div>
         </div>
 
-        <NetworkArt />
+        <RoomPreview />
       </section>
 
       <section

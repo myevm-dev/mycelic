@@ -1,55 +1,50 @@
 /* Theme tokens. Dark is the default; light follows the toggle or the OS. */
+/* Theme tokens: neutral surfaces with the original Mycelic green accent. */
 :root {
   color-scheme: dark;
-  --bg: #0b0e14;
-  --surface: #12161f;
-  --surface2: #191e29;
-  --input: #0e1219;
-  --ink: #e8ebf1;
-  --muted: #9aa3b3;
-  --line: #262d3b;
-  --brand: #93a4ff;
-  --accent: #5fc9be;
-  --danger: #f4a5a5;
-  --danger-bg: #2b1719;
-  --danger-line: #6b3a3e;
-  --hover: #1e2433;
-  --button-bg: #4a5ae4;
-  --button-ink: #ffffff;
-  --soft-accent: #1a2040;
-  --message: #161b25;
-  --my-message: #1c2342;
-  --mine-line: #343f78;
+  --bg: #0b0d0c;
+  --surface: #121514;
+  --surface2: #1a1e1c;
+  --input: #0e1110;
+  --ink: #edf0ee;
+  --muted: #a3aca7;
+  --line: #262c29;
+  --brand: #a0f66c;
+  --accent: #e0bd82;
+  --danger: #f7ada8;
+  --danger-bg: #301b1d;
+  --danger-line: #754344;
+  --hover: #1f2522;
+  --button-bg: #9df465;
+  --button-ink: #102012;
+  --soft-accent: #17241b;
+  --message: #171b19;
+  --my-message: #1d2b21;
+  --mine-line: #3b5540;
   --shadow: 0 1px 2px #0000004d, 0 16px 48px #00000040;
-  --node: #8193ff;
-  --node-opacity: 0.55;
-  --backdrop-opacity: 0.08;
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f5f6f9;
+  --bg: #f6f7f6;
   --surface: #ffffff;
-  --surface2: #f0f2f7;
-  --input: #f8f9fc;
-  --ink: #141925;
-  --muted: #586173;
-  --line: #dde2eb;
-  --brand: #3a4dd6;
-  --accent: #0b746b;
-  --danger: #b4232c;
-  --danger-bg: #fff1f1;
-  --danger-line: #f0c2c4;
-  --hover: #eef1f7;
-  --button-bg: #3a4dd6;
+  --surface2: #f0f2f0;
+  --input: #f9faf9;
+  --ink: #161d19;
+  --muted: #56625b;
+  --line: #dce1dd;
+  --brand: #28713c;
+  --accent: #805d26;
+  --danger: #a12c31;
+  --danger-bg: #fff0f0;
+  --danger-line: #e2b5b7;
+  --hover: #ebefeb;
+  --button-bg: #286f39;
   --button-ink: #ffffff;
-  --soft-accent: #eef0ff;
-  --message: #f2f4f8;
-  --my-message: #eaedff;
-  --mine-line: #c5ccf4;
-  --shadow: 0 1px 2px #1a22380d, 0 12px 36px #1a22380f;
-  --node: #4c5fe0;
-  --node-opacity: 0.45;
-  --backdrop-opacity: 0.07;
+  --soft-accent: #eaf4e4;
+  --message: #f1f3f1;
+  --my-message: #e5f0dd;
+  --mine-line: #b9d0ae;
+  --shadow: 0 1px 2px #1a261d0d, 0 12px 36px #1a261d0f;
 }
 * {
   box-sizing: border-box;
@@ -721,58 +716,7 @@ select {
 .skip-link:focus {
   transform: none;
 }
-.network-backdrop {
-  position: fixed;
-  inset: -80px;
-  pointer-events: none;
-  z-index: -1;
-  opacity: var(--backdrop-opacity);
-  overflow: hidden;
-}
-.node-field {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-.ambient-field {
-  transform: scale(1.2);
-  animation: mesh-drift 30s ease-in-out infinite alternate;
-}
-.network-lines path {
-  stroke: var(--node);
-  stroke-width: 0.65;
-  opacity: 0.3;
-}
-.network-point {
-  opacity: var(--node-opacity);
-  animation: node-pulse 7s ease-in-out infinite;
-  animation-delay: var(--delay);
-}
-.node-core {
-  fill: var(--node);
-}
-.node-glow {
-  fill: var(--node);
-  opacity: 0.08;
-  filter: blur(2px);
-}
-@keyframes node-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  45% {
-    opacity: 0.85;
-  }
-}
-@keyframes mesh-drift {
-  from {
-    transform: scale(1.2) translate(-5px, -4px);
-  }
-  to {
-    transform: scale(1.2) translate(8px, 6px);
-  }
-}
+
 .site-header {
   min-height: 94px;
   padding-top: 20px;
@@ -925,70 +869,7 @@ select {
   gap: 24px;
   flex-wrap: wrap;
 }
-.network-art {
-  position: relative;
-  min-height: 390px;
-  width: 100%;
-  height: 100%;
-}
-.network-art .node-field {
-  position: absolute;
-  inset: 0;
-}
-.room-hub {
-  position: absolute;
-  width: 80px;
-  height: 80px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--input);
-  border: 1px solid var(--mine-line);
-  color: var(--brand);
-  box-shadow:
-    0 0 0 7px color-mix(in srgb, var(--brand) 7%, transparent),
-    0 0 30px color-mix(in srgb, var(--brand) 10%, transparent);
-}
-.room-hub::before {
-  content: "";
-  position: absolute;
-  inset: -11px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-}
-.room-hub svg {
-  width: 35px;
-  height: 35px;
-}
-.chat-hub {
-  left: 27%;
-  top: 40%;
-}
 
-.art-label {
-  position: absolute;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 1.3px;
-}
-
-.art-caption {
-  position: absolute;
-  bottom: 25px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  background: var(--surface);
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 40px;
-  padding: 9px 15px;
-  font-size: 11px;
-  letter-spacing: 0.5px;
-}
-.art-caption span {
-  margin: 0 8px;
-}
 .project-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1472,9 +1353,7 @@ select {
   .network-features p {
     font-size: 13px;
   }
-  .network-art {
-    min-height: 340px;
-  }
+
   .project-grid {
     grid-template-columns: 1fr;
   }
@@ -1527,9 +1406,6 @@ select {
   .product-hero {
     grid-template-columns: 1fr;
     padding: 30px;
-  }
-  .product-hero .network-art {
-    min-height: 350px;
   }
 
   .detail-grid {
@@ -1609,26 +1485,6 @@ select {
   }
   .hero-actions .text-link {
     padding: 10px 0;
-  }
-  .network-art {
-    min-height: 300px;
-  }
-  .room-hub {
-    width: 60px;
-    height: 60px;
-  }
-  .room-hub svg {
-    width: 28px;
-    height: 28px;
-  }
-
-  .art-caption {
-    bottom: 18px;
-    font-size: 10px;
-    padding: 8px 11px;
-  }
-  .art-label {
-    font-size: 8px;
   }
 
   .project-card {
@@ -1735,49 +1591,136 @@ select {
   }
 }
 
-.brand-mark {
-  width: 30px;
-  height: 30px;
-  color: var(--brand);
-  flex-shrink: 0;
-}
-.brand-word {
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.6px;
-  color: var(--ink);
-}
-.brand-word b {
-  font-weight: 500;
-  color: var(--muted);
-}
 .site-header .brand {
   gap: 10px;
 }
 
-/* Single-product homepage: people, agents and the room between them. */
-.person-hub {
+.site-header .brand-logo {
+  display: block;
+  width: 170px;
+  height: auto;
+}
+/* Darken the green wordmark for readability on light backgrounds. */
+html[data-theme="light"] .site-header .brand-logo {
+  filter: brightness(0.45);
+}
+
+/* Hero preview: a static glimpse of a room with a person and an agent. */
+.room-preview {
+  margin: 32px 36px 32px 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--input);
+  overflow: hidden;
+  font-size: 13px;
+}
+.room-preview-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.room-preview-top b {
+  font-weight: 600;
+}
+.room-preview-top .pill {
+  font-size: 10px;
+  padding: 4px 9px;
+}
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.room-preview-feed {
+  display: grid;
+  gap: 14px;
+  padding: 20px 18px;
+}
+.room-line {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.room-line .preview-avatar {
+  position: static;
+  width: 32px;
+  height: 32px;
+  box-shadow: none;
+}
+.room-line .preview-avatar svg {
+  width: 18px;
+  height: 18px;
+}
+.room-line-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.room-line-meta strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.room-line p {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--message);
+  line-height: 1.5;
+}
+.room-line.agent p {
+  background: var(--soft-accent);
+  border-color: var(--mine-line);
+}
+.receipt-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand);
+}
+.receipt-tag svg {
+  width: 12px;
+  height: 12px;
+}
+.room-preview-composer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface);
+}
+.room-preview-composer span:last-child {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--button-ink);
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Single-product homepage: people{
   left: 12%;
   top: 20%;
 }
-.network-art .chat-hub {
-  left: calc(50% - 40px);
-  top: 40%;
-  width: 92px;
-  height: 92px;
-}
-.agent-hub {
-  right: 12%;
-  top: 20%;
-}
-.people-label {
-  left: 12%;
-  top: 9%;
-}
-.agents-label {
-  right: 12%;
-  top: 9%;
-}
+
+
+
+
 .home-section {
   margin-top: 54px;
   scroll-margin-top: 24px;
@@ -2143,17 +2086,6 @@ select {
   }
 }
 @media (max-width: 520px) {
-  .network-art .chat-hub {
-    left: calc(50% - 30px);
-    width: 66px;
-    height: 66px;
-  }
-  .person-hub {
-    left: 8%;
-  }
-  .agent-hub {
-    right: 8%;
-  }
   .home-section,
   .agent-strip {
     margin-top: 36px;
@@ -2188,9 +2120,15 @@ select {
     margin-left: 0;
     justify-content: center;
   }
-  .art-caption {
-    max-width: calc(100% - 24px);
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+@media (max-width: 850px) {
+  .room-preview {
+    margin: 0 24px 24px;
+  }
+}
+@media (max-width: 520px) {
+  .room-preview {
+    margin: 0 16px 20px;
   }
 }
