@@ -31,17 +31,17 @@ test("ephemeral chat clears history, preserves wallet credits, and disables arch
     410,
   );
 });
-test("Voice is coming soon and keeps the shared theme", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto("/");
-  await page.getByRole("link", { name: "Preview Voice", exact: true }).click();
-  await expect(page).toHaveURL(/\/voice$/);
-  await expect(page.getByText("Coming soon", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: /A room to talk/ }),
-  ).toBeVisible();
-  await page.waitForLoadState("networkidle");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.getByRole("button", { name: "Switch to light mode" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+test("retired preview routes redirect to the single product", async ({
+  page,
+}) => {
+  for (const path of ["/games", "/voice", "/forum"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByRole("heading", { name: /Rooms for people/ }),
+    ).toBeVisible();
+  }
+  const llms = await page.request.get("/llms.txt");
+  expect(llms.status()).toBe(200);
+  expect(await llms.text()).toContain('"method":"create"');
 });

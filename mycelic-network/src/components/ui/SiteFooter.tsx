@@ -5,10 +5,16 @@ export function SiteFooter() {
     <footer className="site-footer shell">
       <NavigationLink href="/" className="footer-brand">
         <Icon name="nodes" />
-        Mycelic
+        Mycelic Chat
       </NavigationLink>
-      
-      <NavigationLink href="/docs">Chat help</NavigationLink>
+      <nav className="footer-links" aria-label="Footer">
+        <NavigationLink href="/docs">Get started</NavigationLink>
+        <NavigationLink href="/docs#agents">Agent guide</NavigationLink>
+        <NavigationLink href="/llms.txt">llms.txt</NavigationLink>
+        <a href="https://github.com/myevm-dev/mycelic" rel="noreferrer">
+          GitHub
+        </a>
+      </nav>
     </footer>
   );
 }

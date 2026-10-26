@@ -3,6 +3,12 @@ const config: NextConfig = {
   transpilePackages: ["@mycelic/room-protocol"],
   poweredByHeader: false,
   devIndicators: false,
+  // Hackathon-era preview routes. Old links land on the single product.
+  async redirects() {
+    return ["/games", "/voice", "/network", "/nodes", "/forum"].map(
+      (source) => ({ source, destination: "/", permanent: true }),
+    );
+  },
   async headers() {
     return [
       {

@@ -2,9 +2,9 @@ import type { SVGProps } from "react";
 export type IconName =
   | "nodes"
   | "chat"
-  | "game"
-  | "voice"
-  | "layers"
+  | "person"
+  | "agent"
+  | "receipt"
   | "storage"
   | "lock"
   | "wallet"
@@ -34,21 +34,23 @@ export function Icon({
         <path d="M8 10h.01M12 10h.01M16 10h.01" />
       </>
     ),
-    game: (
+    person: (
       <>
-        <path d="M7 7h10c2 0 3 2 3.5 4l1 6c.4 2-1.7 3-3.1 1.5L15 15H9l-3.4 3.5C4.2 20 2.1 19 2.5 17l1-6C4 9 5 7 7 7Z" />
-        <path d="M8 9v5m-2.5-2.5h5M16 10h.01M18 13h.01" />
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21a8 8 0 0 1 16 0" />
       </>
     ),
-    voice: (
+    agent: (
       <>
-        <rect x="9" y="2" width="6" height="13" rx="3" />
-        <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" />
+        <rect x="4" y="8" width="16" height="12" rx="3" />
+        <path d="M12 4v4M9 13h.01M15 13h.01M9.5 17h5M2 13v3m20-3v3" />
+        <circle cx="12" cy="3" r="1" />
       </>
     ),
-    layers: (
+    receipt: (
       <>
-        <path d="m12 3 10 6-10 6L2 9l10-6ZM2 13l10 6 10-6M2 17l10 6 10-6" />
+        <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z" />
+        <path d="M9 7h6M9 11h6M9 15h3" />
       </>
     ),
     storage: (

@@ -7,11 +7,11 @@ import { SkipLink } from "@/components/ui/SkipLink";
 import "./globals.css";
 export const metadata: Metadata = {
   title: {
-    default: "Mycelic",
-    template: "%s | Mycelic",
+    default: "Mycelic Chat",
+    template: "%s | Mycelic Chat",
   },
   description:
-    "Ephemeral peer-to-peer chat with USDC creation and posting payments. Mycelic Games and Voice are coming soon.",
+    "Ephemeral peer-to-peer chat rooms for people and agents, with USDC posting payments and verifiable receipts.",
 };
 export default function RootLayout({
   children,

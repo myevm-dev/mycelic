@@ -41,62 +41,46 @@ test("homepage project navigation and theme preference persist across pages", as
 
   await page.goto("/");
 
-  await expect(page).toHaveTitle("Mycelic");
+  await expect(page).toHaveTitle("Mycelic Chat");
   await expect(
-    page.getByRole("heading", { name: /Your people/ }),
+    page.getByRole("heading", { name: /Rooms for people/ }),
   ).toBeVisible();
 
-  const projects = page.locator(".project-grid");
+  const modes = page.locator(".mode-grid");
 
-  await expect(projects.locator(":scope > article")).toHaveCount(4);
+  await expect(modes.locator(":scope > article")).toHaveCount(3);
 
-  for (const name of [
-    "Mycelic Chat",
-    "Mycelic Games",
-    "Mycelic Voice",
-    "Mycelic Forum",
-  ]) {
+  for (const name of ["Human ↔ Human", "Human ↔ Agent", "Agent ↔ Agent"]) {
     await expect(
-      projects.getByRole("heading", { name, exact: true }),
+      modes.getByRole("heading", { name, exact: true }),
     ).toBeVisible();
   }
 
-  await expect(
-    projects.getByText("Coming soon", { exact: true }),
-  ).toHaveCount(3);
+  await expect(page.getByText(/coming soon/i)).toHaveCount(0);
 
-  await expect(
-    projects.getByText("Open Chat", { exact: true }),
-  ).toBeVisible();
-
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-theme",
-    "dark",
-  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   await capture(page, "home-dark");
 
-  await page.getByRole("button", {
-    name: "Switch to light mode",
-  }).click();
+  await page
+    .getByRole("button", {
+      name: "Switch to light mode",
+    })
+    .click();
 
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-theme",
-    "light",
-  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
   await capture(page, "home-light");
 
-  await page.getByRole("link", {
-    name: "Explore Chat",
-    exact: true,
-  }).click();
+  await page
+    .getByRole("link", {
+      name: "Open Mycelic Chat",
+      exact: true,
+    })
+    .click();
 
   await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-theme",
-    "light",
-  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(
     page.getByRole("heading", { name: "Mycelic Chat." }),
   ).toBeVisible();
@@ -105,50 +89,51 @@ test("homepage project navigation and theme preference persist across pages", as
 
   await page.reload();
 
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-theme",
-    "light",
-  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
-  await page.getByRole("link", {
-    name: "Mycelic home",
-  }).click();
+  await page
+    .getByRole("link", {
+      name: "Mycelic home",
+    })
+    .click();
 
-  await page.getByRole("link", {
-    name: "Preview Games",
-    exact: true,
-  }).click();
+  await page
+    .getByRole("link", {
+      name: "Agent quickstart",
+      exact: true,
+    })
+    .click();
 
-  await expect(page).toHaveURL(/\/games$/);
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-theme",
-    "light",
+  await expect(page).toHaveURL(/\/docs#agents$/);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("tab", { name: "For agents" })).toHaveAttribute(
+    "aria-selected",
+    "true",
   );
   await expect(
-    page.getByText("Coming soon", { exact: true }),
+    page.getByRole("heading", { name: "Commands", exact: true }),
   ).toBeVisible();
 
-  await capture(page, "games-light");
+  await capture(page, "agents-light");
 
-  await page.getByRole("button", {
-    name: "Switch to dark mode",
-  }).click();
+  await page
+    .getByRole("button", {
+      name: "Switch to dark mode",
+    })
+    .click();
 
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-theme",
-    "dark",
-  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
-  await capture(page, "games-dark");
-
-  await page.getByRole("link", {
-    name: "Chat help",
-    exact: true,
-  }).click();
+  await page.getByRole("tab", { name: "For people" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Chat help." }),
+    page.getByRole("heading", { name: /Your first room/ }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Commands", exact: true }),
+  ).toBeHidden();
+
+  await capture(page, "people-dark");
 
   expect(errors).toEqual([]);
 });
@@ -167,14 +152,12 @@ test("small screens stay within viewport and reduced motion disables node animat
 
     await expect(
       page.getByRole("link", {
-        name: "Explore Chat",
+        name: "Open Mycelic Chat",
         exact: true,
       }),
     ).toBeVisible();
 
-    await expect(
-      page.locator(".project-grid > article"),
-    ).toHaveCount(4);
+    await expect(page.locator(".mode-grid > article")).toHaveCount(3);
 
     expect(
       await page.evaluate(
@@ -186,31 +169,30 @@ test("small screens stay within viewport and reduced motion disables node animat
       await page
         .locator(".network-point")
         .first()
-        .evaluate(
-          (element) => getComputedStyle(element).animationName,
-        ),
+        .evaluate((element) => getComputedStyle(element).animationName),
     ).toBe("none");
 
     if (width === 390) {
       await capture(page, "home-mobile-light");
     }
 
-    await page.getByRole("button", {
-      name: "Switch to dark mode",
-    }).click();
+    await page
+      .getByRole("button", {
+        name: "Switch to dark mode",
+      })
+      .click();
 
-    await expect(page.locator("html")).toHaveAttribute(
-      "data-theme",
-      "dark",
-    );
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
     if (width === 390) {
       await capture(page, "home-mobile-dark");
     }
 
-    await page.getByRole("button", {
-      name: "Switch to light mode",
-    }).click();
+    await page
+      .getByRole("button", {
+        name: "Switch to light mode",
+      })
+      .click();
   }
 });
 
@@ -224,13 +206,13 @@ test("legacy root room links retain their fragment and join the chat route", asy
 
   await page.getByLabel("Room name").fill("Legacy link room");
 
-  await page.getByRole("button", {
-    name: "Create room · 3 USDC",
-  }).click();
+  await page
+    .getByRole("button", {
+      name: "Create room · 3 USDC",
+    })
+    .click();
 
-  await expect(
-    page.getByText("MESH ACTIVE", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("MESH ACTIVE", { exact: true })).toBeVisible();
 
   const link = new URL(page.url());
   const fragment = link.hash;
@@ -246,17 +228,15 @@ test("legacy root room links retain their fragment and join the chat route", asy
     await guest.goto(link.toString());
     await connectTestWallet(guest);
 
-    await expect(guest).toHaveURL(
-      `${link.origin}/chat${fragment}`,
-    );
+    await expect(guest).toHaveURL(`${link.origin}/chat${fragment}`);
 
-    await guest.getByRole("button", {
-      name: "Join room →",
-    }).click();
+    await guest
+      .getByRole("button", {
+        name: "Join room →",
+      })
+      .click();
 
-    await expect(
-      guest.getByText("MESH ACTIVE", { exact: true }),
-    ).toBeVisible();
+    await expect(guest.getByText("MESH ACTIVE", { exact: true })).toBeVisible();
 
     const skip = guest.getByRole("link", {
       name: "Skip to content",
@@ -265,9 +245,7 @@ test("legacy root room links retain their fragment and join the chat route", asy
     await skip.focus();
     await skip.press("Enter");
 
-    await expect(guest).toHaveURL(
-      `${link.origin}/chat${fragment}`,
-    );
+    await expect(guest).toHaveURL(`${link.origin}/chat${fragment}`);
     await expect(guest.locator("main")).toBeFocused();
   } finally {
     await context.close();

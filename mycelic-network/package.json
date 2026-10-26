@@ -1,6 +1,6 @@
 {
   "name": "mycelic-chat",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "license": "GPL-2.0-or-later",

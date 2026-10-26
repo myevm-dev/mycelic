@@ -1,5 +1,4 @@
-/** Product names for the two-feature app. */
+/** Product name for the single Mycelic offering. */
 export const PRODUCT_NAMES = {
   chat: "Mycelic Chat",
-  games: "Mycelic Games",
 } as const;
