@@ -11,6 +11,9 @@ export type IconName =
   | "sun"
   | "moon"
   | "arrow"
+  | "plus"
+  | "home"
+  | "book"
   | "code";
 export function Icon({
   name,
@@ -79,6 +82,19 @@ export function Icon({
     ),
     moon: <path d="M20 15.3A9 9 0 0 1 8.7 4a9 9 0 1 0 11.3 11.3Z" />,
     arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
+    plus: <path d="M12 5v14M5 12h14" />,
+    home: (
+      <>
+        <path d="M3 11 12 4l9 7" />
+        <path d="M5 10v10h14V10M10 20v-6h4v6" />
+      </>
+    ),
+    book: (
+      <>
+        <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" />
+        <path d="M4 21a2 2 0 0 1 2-2h13M8 7h7M8 11h5" />
+      </>
+    ),
     code: (
       <>
         <path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-16-2 18" />

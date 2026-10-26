@@ -25,20 +25,27 @@ export function SiteHeader() {
           loading="eager"
         />
       </NavigationLink>
-      <nav aria-label="Main navigation">
-        {[
-          { href: "/chat", label: "Chat" },
-          { href: "/docs", label: "Get started" },
-          { href: "/docs#agents", label: "Agents" },
-        ].map(({ href, label }) => (
+      <nav aria-label="Main navigation" className="main-nav">
+        {(
+          [
+            { href: "/", label: "Home", icon: "home", mobileOnly: true },
+            { href: "/chat", label: "Chat", icon: "chat" },
+            { href: "/docs", label: "Get started", icon: "book" },
+            { href: "/docs#agents", label: "Agents", icon: "agent" },
+          ] as const
+        ).map((item) => (
           <NavigationLink
-            key={label}
-            href={href}
+            key={item.label}
+            href={item.href}
+            className={"mobileOnly" in item ? "nav-mobile-only" : undefined}
             aria-current={
-              pathname === href && !href.includes("#") ? "page" : undefined
+              pathname === item.href && !item.href.includes("#")
+                ? "page"
+                : undefined
             }
           >
-            {label}
+            <Icon name={item.icon} />
+            <span>{item.label}</span>
           </NavigationLink>
         ))}
       </nav>
@@ -46,6 +53,13 @@ export function SiteHeader() {
         <ThemeToggle />
         <button
           className="wallet-button"
+          aria-label={
+            isConnected
+              ? `Disconnect wallet ${address?.slice(0, 6)}…${address?.slice(-4)}`
+              : isPending
+                ? "Connecting wallet"
+                : "Connect wallet"
+          }
           disabled={isPending}
           onClick={async () => {
             setError("");
@@ -67,12 +81,19 @@ export function SiteHeader() {
           }}
         >
           <Icon name="wallet" />
-          <span>
+          <span className="wallet-full">
             {isConnected
               ? `${address?.slice(0, 6)}…${address?.slice(-4)} · disconnect`
               : isPending
                 ? "Connecting…"
                 : "Connect wallet"}
+          </span>
+          <span className="wallet-short" aria-hidden="true">
+            {isConnected
+              ? `${address?.slice(0, 4)}…${address?.slice(-3)}`
+              : isPending
+                ? "…"
+                : "Connect"}
           </span>
         </button>
       </div>

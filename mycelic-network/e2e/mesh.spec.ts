@@ -98,7 +98,7 @@ test("two actual WebRTC peers authenticate, backfill and exchange paid messages"
     .getByRole("button", { name: "Leave and clear local history" })
     .click();
   await expect(
-    page.getByText("1 connected participants", { exact: true }),
+    page.getByText("1 connected participant", { exact: true }),
   ).toBeVisible();
   await context.close();
 });

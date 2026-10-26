@@ -5,16 +5,14 @@ const KEY = "mycelic.theme";
 const EVENT = "mycelic-theme-change";
 type Theme = "light" | "dark";
 const snapshot = (): Theme =>
-  document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 const subscribe = (callback: () => void) => {
   const changed = (event: StorageEvent) => {
     if (event.key !== KEY) return;
     const theme =
       event.newValue === "light" || event.newValue === "dark"
         ? event.newValue
-        : window.matchMedia("(prefers-color-scheme: light)").matches
-          ? "light"
-          : "dark";
+        : "light";
     document.documentElement.dataset.theme = theme;
     callback();
   };
@@ -29,7 +27,7 @@ export function ThemeToggle() {
   const theme = useSyncExternalStore(
     subscribe,
     snapshot,
-    () => "dark" as const,
+    () => "light" as const,
   );
   const next = theme === "dark" ? "light" : "dark";
   return (

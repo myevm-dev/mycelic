@@ -58,6 +58,17 @@ test("homepage project navigation and theme preference persist across pages", as
 
   await expect(page.getByText(/coming soon/i)).toHaveCount(0);
 
+  // Light is the default, even when the OS prefers dark.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  await capture(page, "home-light");
+
+  await page
+    .getByRole("button", {
+      name: "Switch to dark mode",
+    })
+    .click();
+
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   await capture(page, "home-dark");
@@ -69,8 +80,6 @@ test("homepage project navigation and theme preference persist across pages", as
     .click();
 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-
-  await capture(page, "home-light");
 
   await page
     .getByRole("link", {
@@ -219,9 +228,10 @@ test("legacy root room links retain their fragment and join the chat route", asy
 
     await installTestWallet(guest);
     await guest.goto(link.toString());
-    await connectTestWallet(guest);
-
+    // Wait for the legacy redirect before connecting, or the wallet
+    // connection is lost when the page navigates.
     await expect(guest).toHaveURL(`${link.origin}/chat${fragment}`);
+    await connectTestWallet(guest);
 
     await guest
       .getByRole("button", {

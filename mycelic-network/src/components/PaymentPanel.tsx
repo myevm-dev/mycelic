@@ -102,7 +102,11 @@ export function PaymentPanel({
     }
   };
   return (
-    <section className="card payment-panel" aria-label="Gateway wallet">
+    <section
+      className="card payment-panel"
+      id="gateway"
+      aria-label="Gateway wallet"
+    >
       <div className="section-topline">
         <h2>Gateway wallet</h2>
         <span className="pill">
