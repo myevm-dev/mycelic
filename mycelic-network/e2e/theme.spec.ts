@@ -58,6 +58,17 @@ test("homepage project navigation and theme preference persist across pages", as
 
   await expect(page.getByText(/coming soon/i)).toHaveCount(0);
 
+  // Light is the default, even when the OS prefers dark.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  await capture(page, "home-light");
+
+  await page
+    .getByRole("button", {
+      name: "Switch to dark mode",
+    })
+    .click();
+
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   await capture(page, "home-dark");
@@ -69,8 +80,6 @@ test("homepage project navigation and theme preference persist across pages", as
     .click();
 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-
-  await capture(page, "home-light");
 
   await page
     .getByRole("link", {

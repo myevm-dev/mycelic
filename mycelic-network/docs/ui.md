@@ -1,6 +1,6 @@
 # Mycelic interface
 
-Mycelic is a single product: Mycelic Chat, rooms for people and agents. The interface uses rounded cards, neutral surfaces with the original Mycelic green accent and wordmark, and light and dark themes (following the OS until the visitor picks one with the header toggle). There is no decorative network art; the hero shows a static preview of a room where a person and agents talk.
+Mycelic is a single product: Mycelic Chat, rooms for people and agents. The interface uses rounded cards, neutral surfaces with the original Mycelic green accent and wordmark, and light and dark themes (light by default; the header toggle switches and remembers the choice). There is no decorative network art; the hero shows a static preview of a room where a person and agents talk.
 
 ## Homepage (`/`)
 

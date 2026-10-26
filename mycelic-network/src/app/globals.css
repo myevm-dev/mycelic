@@ -2379,7 +2379,7 @@ html[data-theme="light"] .site-header .brand-logo {
     border-radius: 16px;
   }
   .messages {
-    height: max(220px, calc(100dvh - 480px));
+    height: max(200px, calc(100dvh - 540px));
     padding: 16px;
     gap: 12px;
   }
