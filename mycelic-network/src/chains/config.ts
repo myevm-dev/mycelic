@@ -6,6 +6,9 @@ import {
   optimism,
   mainnet,
   polygon,
+  unichain,
+  avalanche,
+  sonic,
   arcTestnet,
   baseSepolia,
   arbitrumSepolia,
@@ -13,7 +16,12 @@ import {
   optimismSepolia,
   avalancheFuji,
   polygonAmoy,
+  unichainSepolia,
 } from "viem/chains";
+import { CHAIN_CONFIGS } from "@circle-fin/x402-batching/client";
+
+/** viem's sonicTestnet (64165) is not the Sonic testnet Gateway uses (14601). */
+const sonicGatewayTestnet = CHAIN_CONFIGS.sonicTestnet.chain;
 
 /**
  * Shared chains for wallet connection, payment network switching,
@@ -24,29 +32,34 @@ export const APP_CHAINS = [
   base,
   arbitrum,
   optimism,
-  mainnet,
   polygon,
+  unichain,
+  avalanche,
+  sonic,
+  mainnet,
   arcTestnet,
   baseSepolia,
   arbitrumSepolia,
-  sepolia,
   optimismSepolia,
-  avalancheFuji,
   polygonAmoy,
+  unichainSepolia,
+  avalancheFuji,
+  sonicGatewayTestnet,
+  sepolia,
 ] as const;
 
-export const appRpcUrl = (
-  chainId: number,
-): string | undefined => {
+export const appRpcUrl = (chainId: number): string | undefined => {
   const urls: Record<number, string | undefined> = {
     [arc.id]:
-      process.env.NEXT_PUBLIC_ARC_RPC_URL ||
-      arc.rpcUrls.default.http[0],
+      process.env.NEXT_PUBLIC_ARC_RPC_URL || arc.rpcUrls.default.http[0],
     [base.id]: process.env.NEXT_PUBLIC_BASE_RPC_URL,
     [arbitrum.id]: process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL,
     [optimism.id]: process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL,
     [mainnet.id]: process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL,
     [polygon.id]: process.env.NEXT_PUBLIC_POLYGON_RPC_URL,
+    [unichain.id]: process.env.NEXT_PUBLIC_UNICHAIN_RPC_URL,
+    [avalanche.id]: process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL,
+    [sonic.id]: process.env.NEXT_PUBLIC_SONIC_RPC_URL,
   };
 
   if (!APP_CHAINS.some((chain) => chain.id === chainId)) {
@@ -57,9 +70,7 @@ export const appRpcUrl = (
 };
 
 export const getAppNftClient = (chainId: number) => {
-  const chain = APP_CHAINS.find(
-    (candidate) => candidate.id === chainId,
-  );
+  const chain = APP_CHAINS.find((candidate) => candidate.id === chainId);
 
   if (!chain) {
     throw new Error("NFT network not enabled by this app");
