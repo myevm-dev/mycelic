@@ -69,9 +69,10 @@ function PeopleGuide() {
           <Step n={1} title="Get a wallet and USDC">
             <p>
               Install a browser wallet and hold USDC on Arc, or on another
-              network the Gateway panel lists (Base, Arbitrum, Ethereum, OP
-              Mainnet or Polygon). Then press <b>Connect wallet</b> at the top
-              of this page.
+              network the Gateway panel lists: Base, Arbitrum, OP Mainnet,
+              Polygon, Unichain, Avalanche, Sonic or Ethereum. Keep a little of
+              that network’s gas token for the deposit. Then press{" "}
+              <b>Connect wallet</b> at the top of this page.
             </p>
           </Step>
           <Step n={2} title="Deposit into Gateway">

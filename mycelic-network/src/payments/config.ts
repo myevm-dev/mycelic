@@ -52,6 +52,32 @@ export function receiptSigner() {
   return privateKeyToAccount(receiptPrivateKey());
 }
 
+/** Gateway networks Mycelic accepts deposits and payments on. */
+export const PAYMENT_CHAINS = {
+  mainnet: [
+    "arc",
+    "base",
+    "arbitrum",
+    "optimism",
+    "polygon",
+    "unichain",
+    "avalanche",
+    "sonic",
+    "ethereum",
+  ],
+  testnet: [
+    "arcTestnet",
+    "baseSepolia",
+    "arbitrumSepolia",
+    "optimismSepolia",
+    "polygonAmoy",
+    "unichainSepolia",
+    "avalancheFuji",
+    "sonicTestnet",
+    "sepolia",
+  ],
+} as const;
+
 export function publicPaymentConfig(): PublicPaymentConfig {
   const environment =
     process.env.MYCELIC_PAYMENT_ENV === "mainnet"
@@ -107,25 +133,10 @@ export function publicPaymentConfig(): PublicPaymentConfig {
       postAmount: "12000",
     },
 
-    networks: networks.filter((network) =>
-      [
-        // Mainnet networks.
-        5042,
-        8453,
-        42161,
-        10,
-        1,
-        137,
-
-        // Testnet networks.
-        5042002,
-        84532,
-        421614,
-        11155111,
-        11155420,
-        43113,
-        80002,
-      ].includes(network.chainId),
+    // Listed in this order in the Gateway panel. Gateway must also advertise a
+    // network before the server offers it as a payment option.
+    networks: PAYMENT_CHAINS[environment].flatMap((key) =>
+      networks.filter((network) => network.key === key),
     ),
 
     preferredChain:
